@@ -480,7 +480,7 @@
           Printer, Share2, X, Save, Menu, CheckCircle, AlertTriangle, Trash2, 
           Upload, Download, RefreshCw, Copy, Wrench, PackagePlus, PenTool, 
           MessageCircle, Calendar, Clock, DollarSign, CreditCard, Image as ImageIcon, 
-          ArrowUpRight, ArrowDownRight, Activity, TrendingUp, TrendingDown, ToggleLeft, Globe, Eye, UserX, Key,
+          ArrowUpRight, ArrowDownRight, Activity, TrendingUp, TrendingDown, ToggleLeft, Globe, Eye, UserX, Key, User,
           ShieldAlert, Shield, Building, Database, HardDriveDownload, HardDriveUpload, Layers,
           Loader2, LogIn, UserPlus, RefreshCcw, SearchX, Truck, CheckCheck, Pencil,
           Hash, Edit3, Filter, MinusCircle, Crown, Minus, History, Tag,
@@ -504,7 +504,10 @@
             signInAnonymously,
             setPersistence,
             browserLocalPersistence,
-            browserSessionPersistence
+            browserSessionPersistence,
+            updatePassword,
+            reauthenticateWithCredential,
+            EmailAuthProvider
         } from 'firebase/auth';
         import { 
             getFirestore, 
@@ -1989,6 +1992,9 @@ const PlanConfigModal = ({ close }) => {
   const [activePlan, setActivePlan] = React.useState('basic');
   const [config, setConfig] = React.useState({});
   const [loading, setLoading] = React.useState(false);
+  const [newFeature, setNewFeature] = React.useState('');
+  const [editingIndex, setEditingIndex] = React.useState(null);
+  const [editingValue, setEditingValue] = React.useState('');
 
   React.useEffect(() => {
     const unsub = onSnapshot(
@@ -2003,6 +2009,38 @@ const PlanConfigModal = ({ close }) => {
   }, [activePlan]);
 
   const toggle = (k) => setConfig(p => ({ ...p, [k]: !p[k] }));
+  
+  const addFeature = () => {
+    if (!newFeature.trim()) return;
+    const features = config.featuresList || [];
+    setConfig(p => ({ ...p, featuresList: [...features, newFeature.trim()] }));
+    setNewFeature('');
+  };
+  
+  const removeFeature = (index) => {
+    const features = config.featuresList || [];
+    setConfig(p => ({ ...p, featuresList: features.filter((_, i) => i !== index) }));
+  };
+  
+  const startEdit = (index, value) => {
+    setEditingIndex(index);
+    setEditingValue(value);
+  };
+  
+  const saveEdit = () => {
+    if (!editingValue.trim()) return;
+    const features = config.featuresList || [];
+    const updated = [...features];
+    updated[editingIndex] = editingValue.trim();
+    setConfig(p => ({ ...p, featuresList: updated }));
+    setEditingIndex(null);
+    setEditingValue('');
+  };
+  
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditingValue('');
+  };
 
   const save = async () => {
     setLoading(true);
@@ -2023,12 +2061,12 @@ const PlanConfigModal = ({ close }) => {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4">
-      <div className="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+      <div className="bg-slate-800 border border-slate-700 w-full max-w-2xl rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
           <Crown className="w-5 h-5 text-yellow-400" />
           Pengaturan Paket
         </h3>
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-6">
           {['basic','pro'].map(p => (
             <button key={p} onClick={() => setActivePlan(p)}
               className={`flex-1 py-2 rounded-lg font-bold uppercase text-xs ${activePlan===p?'bg-purple-600 text-white':'bg-slate-700 text-slate-400'}`}>
@@ -2036,17 +2074,120 @@ const PlanConfigModal = ({ close }) => {
             </button>
           ))}
         </div>
-        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-          {PLAN_FEATURES.map(f => (
-            <label key={f.id} className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-700">
-              <span className="text-slate-300 text-sm">{f.label}</span>
-              <input type="checkbox" checked={!!config[f.id]} onChange={() => toggle(f.id)} className="accent-purple-600 w-5 h-5"/>
-            </label>
-          ))}
+        
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Hak Akses Fitur */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-300 mb-3 uppercase">Hak Akses Fitur</h4>
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+              {PLAN_FEATURES.map(f => (
+                <label key={f.id} className="flex items-center justify-between bg-slate-900 p-2.5 rounded-lg border border-slate-700 text-xs">
+                  <span className="text-slate-300">{f.label}</span>
+                  <input type="checkbox" checked={!!config[f.id]} onChange={() => toggle(f.id)} className="accent-purple-600 w-4 h-4"/>
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          {/* Deskripsi Fitur untuk User */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-300 mb-3 uppercase">Fitur yang Ditampilkan ke User</h4>
+            <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 mb-3">
+              <div className="flex gap-2 mb-3">
+                <input 
+                  type="text" 
+                  value={newFeature}
+                  onChange={(e) => setNewFeature(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addFeature())}
+                  placeholder="Contoh: Unlimited cabang"
+                  className="flex-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-purple-500"
+                />
+                <button 
+                  onClick={addFeature}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold text-sm"
+                >
+                  <Plus className="w-4 h-4"/>
+                </button>
+              </div>
+              <div className="space-y-1.5 max-h-[30vh] overflow-y-auto">
+                {(config.featuresList || []).length === 0 ? (
+                  <p className="text-slate-500 text-xs py-4 text-center italic">Belum ada fitur ditambahkan</p>
+                ) : (
+                  (config.featuresList || []).map((feat, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-slate-800 p-2 rounded border border-slate-700">
+                      {editingIndex === idx ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                saveEdit();
+                              } else if (e.key === 'Escape') {
+                                cancelEdit();
+                              }
+                            }}
+                            className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-xs focus:outline-purple-500"
+                            autoFocus
+                          />
+                          <button
+                            onClick={saveEdit}
+                            className="text-green-400 hover:text-green-300"
+                            title="Simpan"
+                          >
+                            <Check className="w-4 h-4"/>
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="text-slate-400 hover:text-slate-300"
+                            title="Batal"
+                          >
+                            <X className="w-4 h-4"/>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-slate-300 text-xs flex-1">{feat}</span>
+                          <button
+                            onClick={() => startEdit(idx, feat)}
+                            className="text-blue-400 hover:text-blue-300"
+                            title="Edit"
+                          >
+                            <Pencil className="w-3.5 h-3.5"/>
+                          </button>
+                          <button
+                            onClick={() => removeFeature(idx)}
+                            className="text-red-400 hover:text-red-300"
+                            title="Hapus"
+                          >
+                            <X className="w-4 h-4"/>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2">
+              <p className="text-xs text-slate-300 font-bold flex items-center gap-1">
+                <Info className="w-3 h-3"/> Tips Penggunaan:
+              </p>
+              <ul className="text-xs text-slate-400 space-y-1 ml-4">
+                <li>• Klik <Pencil className="w-3 h-3 inline text-blue-400"/> untuk <strong>edit</strong> fitur</li>
+                <li>• Klik <X className="w-3 h-3 inline text-red-400"/> untuk <strong>hapus</strong> fitur</li>
+                <li>• Gunakan <code className="bg-slate-700 px-1 rounded">**teks**</code> untuk <strong>bold</strong></li>
+                <li>• Contoh: <code className="bg-slate-700 px-1 rounded">**Unlimited** cabang</code> → <strong>Unlimited</strong> cabang</li>
+              </ul>
+            </div>
+          </div>
         </div>
+        
         <div className="flex gap-3 mt-6">
-          <button onClick={close} className="flex-1 py-2 border border-slate-600 rounded-lg text-slate-400 font-bold">Batal</button>
-          <button onClick={save} disabled={loading} className="flex-1 py-2 bg-purple-600 text-white rounded-lg font-bold">
+          <button onClick={close} className="flex-1 py-2.5 border border-slate-600 rounded-lg text-slate-400 font-bold">Batal</button>
+          <button onClick={save} disabled={loading} className="flex-1 py-2.5 bg-purple-600 text-white rounded-lg font-bold">
             {loading?'Menyimpan...':'Simpan'}
           </button>
         </div>
@@ -3643,14 +3784,29 @@ const SuperAdminDashboard = () => {
                      
                      {/* Firebase Quota Monitoring Dashboard */}
                      <div className="px-3 md:px-8 pt-4 md:pt-6 max-w-7xl mx-auto">
+                         {/* Info Alert */}
+                         <div className="bg-amber-900/30 border-2 border-amber-500/50 rounded-xl p-4 mb-4 flex items-start gap-3">
+                             <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5"/>
+                             <div>
+                                 <h4 className="text-amber-200 font-bold text-sm mb-1">📊 Informasi Penting - Data Lokal Session</h4>
+                                 <p className="text-amber-100 text-xs leading-relaxed mb-2">
+                                     Data di bawah hanya mencatat aktivitas <strong>dari browser ini</strong> dan <strong>di-reset setiap hari</strong>. 
+                                     Ini BUKAN total penggunaan Firebase secara keseluruhan.
+                                 </p>
+                                 <p className="text-amber-200 text-xs font-bold">
+                                     ✅ Untuk data akurat semua pengguna, cek: <a href="https://console.firebase.google.com" target="_blank" className="underline hover:text-white">Firebase Console</a>
+                                 </p>
+                             </div>
+                         </div>
+
                          <div className="bg-gradient-to-br from-purple-900 to-slate-800 rounded-2xl p-4 md:p-6 border border-purple-500/30 shadow-2xl mb-4 md:mb-6">
                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 md:gap-0 mb-4 md:mb-6">
                                  <div>
                                      <h2 className="text-xl md:text-2xl font-bold text-white mb-1 flex items-center gap-2">
                                          <Activity className="w-5 h-5 md:w-6 md:h-6 text-purple-400"/>
-                                         Firebase Quota Monitor
+                                         Session Quota Tracker
                                      </h2>
-                                     <p className="text-purple-200 text-xs md:text-sm">Real-time tracking penggunaan Firebase Reads & Writes • Hari ini: {new Date().toLocaleDateString('id-ID')}</p>
+                                     <p className="text-purple-200 text-xs md:text-sm">Tracking lokal browser ini • Hari ini: {new Date().toLocaleDateString('id-ID')} • Reset otomatis tiap hari</p>
                                  </div>
                                  <div className="flex gap-2">
                                      <button 
@@ -3865,6 +4021,32 @@ const SuperAdminDashboard = () => {
                                          Belum ada write operations
                                      </div>
                                  )}
+                             </div>
+                             
+                             {/* Info Box - Cara Lihat Data Akurat */}
+                             <div className="mt-4 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-2 border-cyan-500/40 rounded-xl p-4">
+                                 <div className="flex items-start gap-3 mb-3">
+                                     <ExternalLink className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5"/>
+                                     <div>
+                                         <h4 className="text-cyan-200 font-bold text-sm mb-1">📌 Bagaimana Cara Lihat Data Sebenarnya?</h4>
+                                         <p className="text-cyan-100 text-xs leading-relaxed mb-2">
+                                             Data di atas hanya mencatat aktivitas <strong className="text-white">browser ini saja</strong>. 
+                                             Untuk melihat total penggunaan Firebase dari <strong className="text-white">SEMUA pengguna</strong>, 
+                                             buka Firebase Console:
+                                         </p>
+                                         <a 
+                                             href="https://console.firebase.google.com/project/ifix-enterprise/usage" 
+                                             target="_blank"
+                                             rel="noopener noreferrer"
+                                             className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg"
+                                         >
+                                             <ExternalLink className="w-4 h-4"/> Buka Firebase Console
+                                         </a>
+                                         <p className="text-cyan-300 text-xs mt-3 italic">
+                                             💡 Di Firebase Console, Anda akan melihat data agregat yang akurat dari seluruh aplikasi
+                                         </p>
+                                     </div>
+                                 </div>
                              </div>
                              
                              {/* Tips */}
@@ -4441,7 +4623,7 @@ const SuperAdminDashboard = () => {
                                 {urgentStock.slice(0, 6).map(item => (
                                     <div key={item.id} className="bg-white p-2 rounded border border-amber-200 text-sm flex justify-between">
                                         <span className="font-medium text-slate-700">{item.name}</span>
-                                        <span className="text-amber-700 font-bold">{item.stock} unit</span>
+                                        <span className="text-amber-700 font-bold">{item.stock} pcs</span>
                                     </div>
                                 ))}
                             </div>
@@ -4863,7 +5045,7 @@ const SuperAdminDashboard = () => {
                                                                                 <div className="flex justify-between items-start gap-2">
                                                                                     <div className="flex-1">
                                                                                         <p className="font-bold text-slate-800">{item.name}</p>
-                                                                                        <p className="text-slate-600 mt-0.5">Qty: {item.qty} • Modal: {formatCurrency(item.buyPrice || 0)}/unit • Jual: {formatCurrency(item.sellPrice)}/unit</p>
+                                                                                        <p className="text-slate-600 mt-0.5">Qty: {item.qty} • Modal: {formatCurrency(item.buyPrice || 0)}/pcs • Jual: {formatCurrency(item.sellPrice)}/pcs</p>
                                                                                         {item.category && <p className="text-slate-500 mt-1">📂 {item.category}</p>}
                                                                                     </div>
                                                                                     <span className="font-bold text-cyan-600 whitespace-nowrap">+{formatCurrency(itemProfit)}</span>
@@ -5008,7 +5190,7 @@ const SuperAdminDashboard = () => {
                                                         detailModal.type === 'out_of_stock' ? 'text-red-600' :
                                                         'text-indigo-600'
                                                     }`}>
-                                                        {detailModal.type === 'stock_value' ? formatCurrency(item.stock * item.sellPrice) : item.stock + ' unit'}
+                                                        {detailModal.type === 'stock_value' ? formatCurrency(item.stock * item.sellPrice) : item.stock + ' pcs'}
                                                     </p>
                                                     {detailModal.type === 'stock_value' && (
                                                         <p className="text-xs text-slate-500">{item.stock} x {formatCurrency(item.sellPrice)}</p>
@@ -5833,7 +6015,7 @@ RINGKASAN KPI:
                                                 <th className="p-3 text-center text-slate-700 font-bold">Stok</th>
                                                 <th className="p-3 text-right text-slate-700 font-bold">Modal</th>
                                                 <th className="p-3 text-right text-slate-700 font-bold">Harga Jual</th>
-                                                <th className="p-3 text-right text-slate-700 font-bold">Keuntungan/Unit</th>
+                                                <th className="p-3 text-right text-slate-700 font-bold">Keuntungan/pcs</th>
                                                 <th className="p-3 text-right text-slate-700 font-bold">Nilai Stok</th>
                                             </tr>
                                         </thead>
@@ -7063,7 +7245,7 @@ RINGKASAN KPI:
                                                                     <span className="text-slate-400 font-normal text-[10px]">x{p.qty}</span>
                                                                 </div>
                                                                 <div className="text-[10px] text-slate-600 font-semibold ml-5">
-                                                                    {formatCurrency(p.sellPrice || 0)} <span className="text-slate-400 font-normal">/ unit</span>
+                                                                    {formatCurrency(p.sellPrice || 0)} <span className="text-slate-400 font-normal">/ pcs</span>
                                                                     {p.qty > 1 && <span className="text-purple-600 ml-2">= {formatCurrency((p.sellPrice || 0) * p.qty)}</span>}
                                                                 </div>
                                                             </div>
@@ -8078,7 +8260,7 @@ RINGKASAN KPI:
             const addToCart = (item) => {
                 // Warning jika stok 0 atau kurang
                 if (item.stock <= 0) {
-                    if (!confirm(`⚠️ Stok ${item.name} saat ini ${item.stock || 0} unit.\n\nTetap tambahkan ke keranjang?`)) {
+                    if (!confirm(`⚠️ Stok ${item.name} saat ini ${item.stock || 0} pcs.\n\nTetap tambahkan ke keranjang?`)) {
                         return;
                     }
                 }
@@ -8091,7 +8273,7 @@ RINGKASAN KPI:
                         // Izinkan tambah qty meskipun stok 0 (dengan warning sebelumnya)
                         setCart(cart.map(c => c.id === item.id ? {...c, qty: c.qty + 1} : c));
                     } else {
-                        alert(`Stok ${item.name} hanya ${item.stock} unit`);
+                        alert(`Stok ${item.name} hanya ${item.stock} pcs`);
                     }
                 } else {
                     setCart([...cart, {...item, qty: 1, subCategory: item.subCategory || '', brand: item.brand || ''}]);
@@ -8172,7 +8354,7 @@ RINGKASAN KPI:
                     if (newQty <= item.stock) {
                         setCart(cart.map(c => c.id === itemId ? {...c, qty: newQty} : c));
                     } else {
-                        alert(`Stok ${item.name} hanya ${item.stock} unit`);
+                        alert(`Stok ${item.name} hanya ${item.stock} pcs`);
                     }
                 }
             };
@@ -11000,7 +11182,7 @@ RINGKASAN KPI:
                     <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
                         <div>
                             <h3 className="font-bold text-slate-800">Pengaturan Peringatan Stok</h3>
-                            <p className="text-sm text-slate-500">Threshold saat ini: <span className="font-bold text-blue-600">{stockThreshold} unit</span></p>
+                            <p className="text-sm text-slate-500">Threshold saat ini: <span className="font-bold text-blue-600">{stockThreshold} pcs</span></p>
                         </div>
                         <button 
                             onClick={() => {
@@ -11065,7 +11247,7 @@ RINGKASAN KPI:
                         )}
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                        <h3 className="font-bold text-yellow-900 mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> ⚠️ Stok Rendah (≤{stockThreshold} unit)</h3>
+                        <h3 className="font-bold text-yellow-900 mb-3 flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> ⚠️ Stok Rendah (≤{stockThreshold} pcs)</h3>
                         {lowStockItems.filter(i => {
                             const matchCategory = !alertCategoryFilter || i.category === alertCategoryFilter;
                             const matchSubCategory = !alertSubCategoryFilter || i.subCategory === alertSubCategoryFilter;
@@ -11084,7 +11266,7 @@ RINGKASAN KPI:
                                             <p className="font-bold text-slate-800">{item.name}</p>
                                             <div className="flex gap-2 mt-1 text-xs flex-wrap">
                                                 <span className={`px-2 py-1 rounded font-bold ${item.stock <= Math.floor(stockThreshold / 2) ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                    Stok: {item.stock} unit {item.stock <= Math.floor(stockThreshold / 2) ? '(SANGAT RENDAH!)' : ''}
+                                                    Stok: {item.stock} pcs {item.stock <= Math.floor(stockThreshold / 2) ? '(SANGAT RENDAH!)' : ''}
                                                 </span>
                                                 {item.category && <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold">📦 {item.category}</span>}
                                                 {item.subCategory && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">→ {item.subCategory}</span>}
@@ -11109,8 +11291,8 @@ RINGKASAN KPI:
                         </h3>
                         <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4">
                             <p className="text-sm text-slate-600">Stok Saat Ini:</p>
-                            <p className="text-2xl font-bold text-blue-600">{adjustModal.stock || 0} unit</p>
-                            <p className="text-xs text-slate-500 mt-1">Min Stok: <span className="font-bold">{adjustModal.minStock || stockThreshold} unit</span></p>
+                            <p className="text-2xl font-bold text-blue-600">{adjustModal.stock || 0} pcs</p>
+                            <p className="text-xs text-slate-500 mt-1">Min Stok: <span className="font-bold">{adjustModal.minStock || stockThreshold} pcs</span></p>
                         </div>
                         <div className="space-y-4">
                             <div>
@@ -11137,12 +11319,12 @@ RINGKASAN KPI:
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Minimal Stok Baru (Opsional)</label>
                                 <NumberInput value={newMinStock} onChange={setNewMinStock} placeholder={`Default: ${adjustModal.minStock || stockThreshold}`} className="w-full border p-3 rounded-lg text-sm focus:outline-blue-500 font-bold" min="1" />
-                                <p className="text-[10px] text-slate-500 mt-1">Kosongkan untuk tidak mengubah. Default: {adjustModal.minStock || stockThreshold} unit</p>
+                                <p className="text-[10px] text-slate-500 mt-1">Kosongkan untuk tidak mengubah. Default: {adjustModal.minStock || stockThreshold} pcs</p>
                             </div>
                             <div className="bg-slate-50 p-3 rounded-lg">
                                 <p className="text-xs text-slate-600 mb-1">Stok Baru:</p>
                                 <p className="text-lg font-bold text-slate-800">
-                                    {adjustType === 'add' ? (adjustModal.stock || 0) + adjustAmount : Math.max(0, (adjustModal.stock || 0) - adjustAmount)} unit
+                                    {adjustType === 'add' ? (adjustModal.stock || 0) + adjustAmount : Math.max(0, (adjustModal.stock || 0) - adjustAmount)} pcs
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -11219,7 +11401,7 @@ RINGKASAN KPI:
                             <div>
                                 <label className="text-xs font-bold text-slate-600 block mb-2">Minimal Stok</label>
                                 <NumberInput value={editModal.minStock || ''} onChange={(val) => setEditModal({...editModal, minStock: val})} className="w-full border p-3 rounded-lg text-sm focus:outline-blue-500 font-bold" placeholder={stockThreshold.toString()}/>
-                                <p className="text-xs text-slate-500 mt-1">Kosongkan untuk menggunakan default ({stockThreshold} unit)</p>
+                                <p className="text-xs text-slate-500 mt-1">Kosongkan untuk menggunakan default ({stockThreshold} pcs)</p>
                             </div>
                             <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
                                 <p className="text-xs text-slate-600 mb-1">Margin Keuntungan:</p>
@@ -11305,7 +11487,7 @@ RINGKASAN KPI:
                             <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
                                 <h5 className="font-bold text-yellow-800 text-sm mb-1">Preview Peringatan:</h5>
                                 <p className="text-xs text-yellow-700">
-                                    Dengan threshold <span className="font-bold">{tempSettings.minStockThreshold || stockThreshold} unit</span>, 
+                                    Dengan threshold <span className="font-bold">{tempSettings.minStockThreshold || stockThreshold} pcs</span>, 
                                     akan ada <span className="font-bold">{inv.filter(i => (i.stock || 0) <= (tempSettings.minStockThreshold || stockThreshold) && (i.stock || 0) > 0).length} item</span> yang muncul peringatan stok rendah.
                                 </p>
                             </div>
@@ -12608,6 +12790,50 @@ RINGKASAN KPI:
                  }
              };
 
+             const handleChangePassword = async (e) => {
+                 e.preventDefault();
+                 const formData = new FormData(e.target);
+                 const currentPassword = formData.get('currentPassword');
+                 const newPassword = formData.get('newPassword');
+                 const confirmPassword = formData.get('confirmPassword');
+                 
+                 if (newPassword !== confirmPassword) {
+                     alert('❌ Password baru dan konfirmasi tidak cocok!');
+                     return;
+                 }
+                 
+                 if (newPassword.length < 6) {
+                     alert('❌ Password baru minimal 6 karakter!');
+                     return;
+                 }
+                 
+                 setSaving(true);
+                 try {
+                     const currentUser = auth.currentUser;
+                     
+                     // Reautentikasi user dengan password lama
+                     const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+                     await reauthenticateWithCredential(currentUser, credential);
+                     
+                     // Update password baru
+                     await updatePassword(currentUser, newPassword);
+                     
+                     alert('✅ Password berhasil diubah!\n\nGunakan password baru untuk login berikutnya.');
+                     setModal(null);
+                 } catch (err) {
+                     console.error('Error changing password:', err);
+                     if (err.code === 'auth/wrong-password') {
+                         alert('❌ Password lama salah!');
+                     } else if (err.code === 'auth/requires-recent-login') {
+                         alert('❌ Sesi login Anda sudah terlalu lama. Silakan logout dan login kembali untuk mengganti password.');
+                     } else {
+                         alert('❌ Gagal mengganti password: ' + err.message);
+                     }
+                 } finally {
+                     setSaving(false);
+                 }
+             };
+
              return (
                  <div className="space-y-8 max-w-4xl">
                      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
@@ -12650,6 +12876,54 @@ RINGKASAN KPI:
                              </div>
                          </div>
                      )}
+
+                     {/* PROFIL OWNER */}
+                     <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-green-500">
+                         <h3 className="font-bold text-xl mb-6 flex items-center gap-2 text-slate-800"><User className="w-6 h-6 text-green-600"/> Profil Owner</h3>
+                         <div className="space-y-4">
+                             <div>
+                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Nama Bisnis / Owner</label>
+                                 <input 
+                                     className="w-full border border-slate-300 p-3 rounded-lg font-bold text-slate-800 bg-slate-50" 
+                                     value={activeOwner?.name || ''} 
+                                     disabled
+                                     title="Hubungi superadmin untuk mengubah nama bisnis"
+                                 />
+                                 <p className="text-xs text-slate-500 mt-1">💡 Hubungi superadmin untuk mengubah nama bisnis</p>
+                             </div>
+                             <div>
+                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Email Login</label>
+                                 <input 
+                                     className="w-full border border-slate-300 p-3 rounded-lg text-slate-800 bg-slate-50" 
+                                     value={user?.email || ''} 
+                                     disabled
+                                     title="Hubungi superadmin untuk mengubah email login"
+                                 />
+                                 <p className="text-xs text-slate-500 mt-1">💡 Hubungi superadmin untuk mengubah email login</p>
+                             </div>
+                             <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                                 <div className="flex items-center gap-2 mb-2">
+                                     <Package className="w-5 h-5 text-blue-600"/>
+                                     <p className="font-bold text-blue-900">Paket Langganan</p>
+                                 </div>
+                                 <p className="text-2xl font-black text-blue-600 uppercase mb-1">{activeOwner?.plan || 'Basic'} Plan</p>
+                                 <p className="text-xs text-blue-700">Untuk upgrade/downgrade paket,  hubungi superadmin</p>
+                             </div>
+                         </div>
+                     </div>
+
+                     {/* GANTI PASSWORD */}
+                     <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-yellow-500">
+                         <h3 className="font-bold text-xl mb-2 flex items-center gap-2 text-slate-800"><Lock className="w-6 h-6 text-yellow-600"/> Ganti Password</h3>
+                         <p className="text-sm text-slate-500 mb-6">Ubah password login Anda untuk meningkatkan keamanan akun</p>
+                         <button 
+                             onClick={() => setModal('changePassword')}
+                             className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 text-white p-4 rounded-xl font-bold hover:from-yellow-700 hover:to-orange-700 transition-all flex items-center justify-center gap-2 shadow-lg"
+                         >
+                             <Key className="w-5 h-5"/>
+                             Ubah Password Saya
+                         </button>
+                     </div>
 
                      {/* MASTER DATA MANAGEMENT */}
                      <div className="bg-gradient-to-br from-purple-50 to-blue-50 p-8 rounded-2xl border border-purple-200 shadow-sm">
@@ -12730,15 +13004,7 @@ RINGKASAN KPI:
                              {activeOwner.plan === 'pro' && <span className="bg-purple-100 text-purple-600 px-3 py-1 rounded text-xs font-bold border border-purple-200 flex items-center gap-1"><Crown className="w-3 h-3"/> PRO PLAN</span>}
                          </div>
                          
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                             <div className={`bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col items-center text-center ${activeOwner.plan === 'basic' ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                                 <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4"><Database className="w-6 h-6"/></div>
-                                 <h4 className="font-bold text-slate-800">Backup Per Item</h4>
-                                 <p className="text-xs text-slate-500 mt-2 mb-4">Backup data per kategori seperti stok, pelanggan, servis, dll.</p>
-                                 <button onClick={()=>setModal('backup')} disabled={saving} className="mt-auto w-full py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 flex items-center justify-center gap-2">
-                                     <Download className="w-4 h-4"/> Backup Per Item
-                                 </button>
-                             </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                              <div className={`bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col items-center text-center ${activeOwner.plan === 'basic' ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4"><HardDriveDownload className="w-6 h-6"/></div>
                                  <h4 className="font-bold text-slate-800">Download Backup</h4>
@@ -14208,6 +14474,68 @@ RINGKASAN KPI:
                      {modal === 'brandItems' && <BrandItemsModal close={()=>setModal(null)} ownerId={activeOwner?.id} />}
                      {modal === 'inventorySettings' && <InventorySettingsModal close={()=>setModal(null)} ownerId={activeOwner?.id} storeId={activeStore?.id} />}
                      {modal === 'backup' && <BackupModal close={()=>setModal(null)} />}
+                     
+                     {modal === 'changePassword' && (
+                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+                             <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                                 <div className="flex items-center gap-3 mb-6">
+                                     <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                                         <Key className="w-6 h-6 text-yellow-600"/>
+                                     </div>
+                                     <div>
+                                         <h3 className="font-bold text-xl text-slate-800">Ganti Password</h3>
+                                         <p className="text-sm text-slate-500">Ubah password login Anda</p>
+                                     </div>
+                                 </div>
+                                 <form onSubmit={handleChangePassword} className="space-y-4">
+                                     <div>
+                                         <label className="text-xs font-bold uppercase text-slate-500 mb-2 block">Password Lama</label>
+                                         <input 
+                                             name="currentPassword" 
+                                             type="password" 
+                                             className="w-full border border-slate-300 p-3 rounded-lg focus:outline-yellow-500" 
+                                             placeholder="Masukkan password lama" 
+                                             required
+                                             minLength="6"
+                                         />
+                                     </div>
+                                     <div>
+                                         <label className="text-xs font-bold uppercase text-slate-500 mb-2 block">Password Baru</label>
+                                         <input 
+                                             name="newPassword" 
+                                             type="password" 
+                                             className="w-full border border-slate-300 p-3 rounded-lg focus:outline-yellow-500" 
+                                             placeholder="Masukkan password baru (min 6 karakter)" 
+                                             required
+                                             minLength="6"
+                                         />
+                                     </div>
+                                     <div>
+                                         <label className="text-xs font-bold uppercase text-slate-500 mb-2 block">Konfirmasi Password Baru</label>
+                                         <input 
+                                             name="confirmPassword" 
+                                             type="password" 
+                                             className="w-full border border-slate-300 p-3 rounded-lg focus:outline-yellow-500" 
+                                             placeholder="Ketik ulang password baru" 
+                                             required
+                                             minLength="6"
+                                         />
+                                     </div>
+                                     <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                                         <p className="text-xs text-blue-700">
+                                             💡 <strong>Tips Keamanan:</strong> Gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol untuk password yang lebih kuat.
+                                         </p>
+                                     </div>
+                                     <div className="flex gap-3 mt-6">
+                                         <button type="button" onClick={()=>setModal(null)} className="flex-1 py-3 border rounded-xl font-bold hover:bg-slate-50">Batal</button>
+                                         <button disabled={saving} className="flex-1 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-xl font-bold hover:from-yellow-700 hover:to-orange-700 flex items-center justify-center gap-2">
+                                             {saving ? <><Loader2 className="w-4 h-4 animate-spin"/> Menyimpan...</> : <><Key className="w-4 h-4"/> Ubah Password</>}
+                                         </button>
+                                     </div>
+                                 </form>
+                             </div>
+                         </div>
+                     )}
                      
                      {modal === 'storePermissions' && (
                          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-2">
@@ -18915,9 +19243,50 @@ RINGKASAN KPI:
             const [initialServiceData, setInitialServiceData] = useState(null);
             const [showAdminMessagePopup, setShowAdminMessagePopup] = useState(false);
             const [showPackageModal, setShowPackageModal] = useState(false);
+            const [selectedPlan, setSelectedPlan] = useState('basic');
+            const [planConfigs, setPlanConfigs] = useState({ basic: {}, pro: {} });
             const [lastDismissedMessageTime, setLastDismissedMessageTime] = useState(() => {
                 return localStorage.getItem('lastDismissedMessageTime') || null;
             });
+            
+            // Load plan configs for package modal
+            useEffect(() => {
+                const unsubBasic = onSnapshot(
+                    doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', 'basic'),
+                    (snap) => {
+                        if (snap.exists()) {
+                            setPlanConfigs(prev => ({ ...prev, basic: snap.data() }));
+                        }
+                    }
+                );
+                const unsubPro = onSnapshot(
+                    doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', 'pro'),
+                    (snap) => {
+                        if (snap.exists()) {
+                            setPlanConfigs(prev => ({ ...prev, pro: snap.data() }));
+                        }
+                    }
+                );
+                if (window.firestoreListeners) {
+                    window.firestoreListeners.add(unsubBasic);
+                    window.firestoreListeners.add(unsubPro);
+                }
+                return () => {
+                    if (window.firestoreListeners) {
+                        window.firestoreListeners.delete(unsubBasic);
+                        window.firestoreListeners.delete(unsubPro);
+                    }
+                    unsubBasic();
+                    unsubPro();
+                };
+            }, []);
+            
+            // Set selectedPlan when modal opens
+            useEffect(() => {
+                if (showPackageModal && activeOwner?.plan) {
+                    setSelectedPlan(activeOwner.plan.toLowerCase());
+                }
+            }, [showPackageModal, activeOwner?.plan]);
             
             // Monitor access notifications
             useAccessNotification(user);
@@ -19177,164 +19546,220 @@ RINGKASAN KPI:
                     {/* Subscription Package Modal */}
                     {showPackageModal && (
                         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-fade-in">
-                            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] overflow-y-auto">
-                                {/* Header */}
-                                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-6 text-center relative">
-                                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
-                                        <Crown className="w-8 h-8 text-white"/>
-                                    </div>
-                                    <h2 className="text-2xl font-black text-white">Paket Langganan</h2>
-                                    <p className="text-emerald-100 text-sm mt-1">iFix Pro Enterprise Cloud SaaS</p>
-                                    <button 
-                                        onClick={() => setShowPackageModal(false)}
-                                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
-                                    >
-                                        <X className="w-5 h-5 text-white"/>
-                                    </button>
-                                </div>
-
-                                {/* Content */}
-                                <div className="p-6 space-y-6">
-                                    {/* Info Paket Saat Ini */}
-                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-5">
-                                        <h3 className="font-bold text-sm text-blue-900 mb-3 flex items-center gap-2">
-                                            <Info className="w-4 h-4"/> Paket Anda Saat Ini
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-xs text-slate-600 mb-1">Paket Aktif</p>
-                                                <p className="text-lg font-bold text-slate-800 uppercase">{activeOwner?.plan || 'Basic'}</p>
+                                <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden animate-scale-up max-h-[90vh] overflow-y-auto">
+                                    {/* Compact Header */}
+                                    <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-4 relative">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                                                    <Crown className="w-6 h-6 text-white"/>
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-xl font-black text-white">Paket Langganan</h2>
+                                                    <p className="text-emerald-100 text-xs">iFix Pro Enterprise Cloud SaaS</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-xs text-slate-600 mb-1">Status Langganan</p>
-                                                {subscriptionStatus && subscriptionStatus.status === 'active' ? (
-                                                    <p className="text-sm font-bold text-green-600">
-                                                        <CheckCircle className="w-4 h-4 inline mr-1"/>
-                                                        {subscriptionStatus.remainingDays} hari tersisa
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-sm font-bold text-red-600">
-                                                        <AlertCircle className="w-4 h-4 inline mr-1"/>
-                                                        {subscriptionStatus?.expired ? 'Expired' : 'Tidak Aktif'}
-                                                    </p>
-                                                )}
-                                            </div>
+                                            <button 
+                                                onClick={() => setShowPackageModal(false)}
+                                                className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all"
+                                            >
+                                                <X className="w-5 h-5 text-white"/>
+                                            </button>
                                         </div>
                                     </div>
 
-                                    {/* Daftar Paket */}
-                                    <div>
-                                        <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                                            <Package className="w-5 h-5 text-emerald-600"/> Pilihan Paket Langganan
-                                        </h3>
-                                        
-                                        <div className="grid md:grid-cols-2 gap-4 mb-6">
-                                            {/* Basic Plan */}
-                                            <div className="border-2 border-slate-200 rounded-xl p-5 hover:border-blue-400 transition-all bg-white">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <h4 className="font-bold text-lg text-slate-800">Basic Plan</h4>
-                                                    <span className="bg-slate-100 text-slate-600 text-xs px-3 py-1 rounded-full font-bold">PEMULA</span>
+                                    {/* Content */}
+                                    <div className="p-5">
+                                        {/* Current Plan Info - Compact */}
+                                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-3 mb-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-gradient-to-br from-blue-500 to-purple-500 text-white px-3 py-1.5 rounded-lg font-bold text-sm">
+                                                        {(activeOwner?.plan || 'Basic').toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-600">Status Langganan</p>
+                                                        {subscriptionStatus && subscriptionStatus.status === 'active' ? (
+                                                            <p className="text-sm font-bold text-green-600 flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3"/> {subscriptionStatus.remainingDays} hari tersisa
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-red-600 flex items-center gap-1">
+                                                                <AlertCircle className="w-3 h-3"/> {subscriptionStatus?.expired ? 'Expired' : 'Tidak Aktif'}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="mb-4">
-                                                    <p className="text-2xl font-black text-blue-600 mb-1">Rp {(subConfig?.basicFirstYear || 1200000).toLocaleString('id-ID')}</p>
-                                                    <p className="text-xs text-slate-500">per tahun (tahun pertama)</p>
-                                                    <p className="text-sm font-bold text-emerald-600 mt-1">Rp {(subConfig?.basicRenewal || 960000).toLocaleString('id-ID')}/tahun berikutnya</p>
-                                                </div>
-                                                <ul className="space-y-2 text-sm text-slate-700 mb-4">
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span>Maksimal <strong>1 Cabang</strong></span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span>Semua fitur dasar POS</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5"/>
-                                                        <span className="line-through text-slate-400">Backup otomatis</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5"/>
-                                                        <span className="line-through text-slate-400">Support prioritas</span>
-                                                    </li>
-                                                </ul>
-                                            </div>
-
-                                            {/* Pro Plan */}
-                                            <div className="border-2 border-purple-400 rounded-xl p-5 bg-gradient-to-br from-purple-50 to-blue-50 relative overflow-hidden">
-                                                <div className="absolute top-0 right-0 bg-gradient-to-br from-purple-600 to-pink-600 text-white text-xs px-3 py-1 rounded-bl-lg font-bold">
-                                                    ⭐ POPULER
-                                                </div>
-                                                <div className="flex items-center justify-between mb-3 mt-6">
-                                                    <h4 className="font-bold text-lg text-slate-800">Pro Plan</h4>
-                                                    <span className="bg-purple-600 text-white text-xs px-3 py-1 rounded-full font-bold">BISNIS</span>
-                                                </div>
-                                                <div className="mb-4">
-                                                    <p className="text-2xl font-black text-purple-600 mb-1">Rp {(subConfig?.proFirstYear || 2400000).toLocaleString('id-ID')}</p>
-                                                    <p className="text-xs text-slate-600">per tahun (tahun pertama)</p>
-                                                    <p className="text-sm font-bold text-emerald-600 mt-1">Rp {(subConfig?.proRenewal || 1920000).toLocaleString('id-ID')}/tahun berikutnya</p>
-                                                </div>
-                                                <ul className="space-y-2 text-sm text-slate-700 mb-4">
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span><strong>Unlimited</strong> cabang</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span>Semua fitur lengkap</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span>Backup otomatis</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span>Support prioritas 24/7</span>
-                                                    </li>
-                                                    <li className="flex items-start gap-2">
-                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
-                                                        <span>Custom request fitur</span>
-                                                    </li>
-                                                </ul>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Info Kontak */}
-                                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5">
-                                        <h3 className="font-bold text-sm text-green-900 mb-3 flex items-center gap-2">
-                                            <MessageCircle className="w-4 h-4"/> Cara Berlangganan
-                                        </h3>
-                                        <p className="text-sm text-slate-700 mb-4 leading-relaxed">
-                                            Untuk berlangganan atau memperpanjang paket, silakan hubungi admin kami melalui WhatsApp. 
-                                            Tim kami siap membantu Anda memilih paket yang sesuai dengan kebutuhan bisnis Anda.
-                                        </p>
-                                        <a 
-                                            href={`https://wa.me/${adminWhatsApp || '6281234567890'}?text=Halo%20Admin%2C%20saya%20ingin%20berlangganan%20iFix%20Enterprise.%0A%0ABisnis%3A%20${encodeURIComponent(activeOwner?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}%0A%0ASaya%20tertarik%20dengan%20paket%3A%20`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl"
+                                        {/* Tab Selector */}
+                                        <div className="flex gap-2 mb-4 p-1 bg-slate-100 rounded-xl">
+                                            <button
+                                                onClick={() => setSelectedPlan('basic')}
+                                                className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all ${
+                                                    selectedPlan === 'basic' 
+                                                    ? 'bg-white text-blue-600 shadow-md' 
+                                                    : 'text-slate-600 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Basic Plan
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedPlan('pro')}
+                                                className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition-all ${
+                                                    selectedPlan === 'pro' 
+                                                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md' 
+                                                    : 'text-slate-600 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Pro Plan ⭐
+                                            </button>
+                                        </div>
+
+                                        {/* Plan Details - Animated */}
+                                        <div className="relative">
+                                            {selectedPlan === 'basic' && (
+                                                <div className="border-2 border-blue-300 rounded-xl p-5 bg-gradient-to-br from-blue-50 to-slate-50 animate-fade-in">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div>
+                                                            <h3 className="text-2xl font-black text-blue-600 mb-1">
+                                                                Rp {(subConfig?.basicFirstYear || 1200000).toLocaleString('id-ID')}
+                                                            </h3>
+                                                            <p className="text-xs text-slate-600">per tahun (tahun pertama)</p>
+                                                            <p className="text-sm font-bold text-emerald-600 mt-1">
+                                                                Rp {(subConfig?.basicRenewal || 960000).toLocaleString('id-ID')}/tahun berikutnya
+                                                            </p>
+                                                        </div>
+                                                        <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-bold text-sm">
+                                                            PEMULA
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid md:grid-cols-2 gap-3">
+                                                        {(planConfigs.basic.featuresList && planConfigs.basic.featuresList.length > 0) ? (
+                                                            planConfigs.basic.featuresList.map((feat, idx) => (
+                                                                <div key={idx} className="flex items-start gap-2 text-sm">
+                                                                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                    <span dangerouslySetInnerHTML={{ __html: feat.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-start gap-2 text-sm">
+                                                                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                    <span>Maksimal <strong>1 Cabang</strong></span>
+                                                                </div>
+                                                                <div className="flex items-start gap-2 text-sm">
+                                                                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                    <span>Semua fitur dasar POS</span>
+                                                                </div>
+                                                                <div className="flex items-start gap-2 text-sm">
+                                                                    <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5"/>
+                                                                    <span className="line-through text-slate-400">Backup otomatis</span>
+                                                                </div>
+                                                                <div className="flex items-start gap-2 text-sm">
+                                                                    <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5"/>
+                                                                    <span className="line-through text-slate-400">Support prioritas</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {selectedPlan === 'pro' && (
+                                                <div className="border-2 border-purple-400 rounded-xl p-5 bg-gradient-to-br from-purple-50 to-pink-50 animate-fade-in relative overflow-hidden">
+                                                    <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-2xl"></div>
+                                                    <div className="relative">
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <div>
+                                                                <h3 className="text-2xl font-black text-purple-600 mb-1">
+                                                                    Rp {(subConfig?.proFirstYear || 2400000).toLocaleString('id-ID')}
+                                                                </h3>
+                                                                <p className="text-xs text-slate-600">per tahun (tahun pertama)</p>
+                                                                <p className="text-sm font-bold text-emerald-600 mt-1">
+                                                                    Rp {(subConfig?.proRenewal || 1920000).toLocaleString('id-ID')}/tahun berikutnya
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex flex-col gap-1 items-end">
+                                                                <span className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-bold text-sm">
+                                                                    BISNIS
+                                                                </span>
+                                                                <span className="text-xs text-purple-600 font-bold">⭐ POPULER</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="grid md:grid-cols-2 gap-3">
+                                                            {(planConfigs.pro.featuresList && planConfigs.pro.featuresList.length > 0) ? (
+                                                                planConfigs.pro.featuresList.map((feat, idx) => (
+                                                                    <div key={idx} className="flex items-start gap-2 text-sm">
+                                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                        <span dangerouslySetInnerHTML={{ __html: feat.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}></span>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                        <span><strong>Unlimited</strong> cabang</span>
+                                                                    </div>
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                        <span>Semua fitur lengkap</span>
+                                                                    </div>
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                        <span>Backup otomatis</span>
+                                                                    </div>
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                        <span>Support prioritas 24/7</span>
+                                                                    </div>
+                                                                    <div className="flex items-start gap-2 text-sm">
+                                                                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"/>
+                                                                        <span>Custom request fitur</span>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Contact CTA - Compact */}
+                                        <div className="mt-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-4">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <MessageCircle className="w-5 h-5 text-green-600"/>
+                                                <div>
+                                                    <h4 className="font-bold text-sm text-green-900">Hubungi Admin</h4>
+                                                    <p className="text-xs text-slate-600">Tim kami siap membantu Anda</p>
+                                                </div>
+                                            </div>
+                                            <a 
+                                                href={`https://wa.me/${adminWhatsApp || '6281234567890'}?text=Halo%20Admin%2C%20saya%20ingin%20berlangganan%20${selectedPlan.toUpperCase()}%20PLAN%20iFix%20Enterprise.%0A%0ABisnis%3A%20${encodeURIComponent(activeOwner?.name || '')}%0AEmail%3A%20${encodeURIComponent(user?.email || '')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg text-sm"
+                                            >
+                                                <MessageCircle className="w-4 h-4"/> WhatsApp Admin
+                                            </a>
+                                            {adminWhatsApp && (
+                                                <p className="text-xs text-center text-slate-500 mt-2 flex items-center justify-center gap-1">
+                                                    <Phone className="w-3 h-3"/> +{adminWhatsApp}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Close Button - Compact */}
+                                        <button 
+                                            onClick={() => setShowPackageModal(false)}
+                                            className="w-full mt-3 py-2.5 border-2 border-slate-200 text-slate-600 rounded-lg font-bold hover:bg-slate-50 transition-all text-sm"
                                         >
-                                            <MessageCircle className="w-5 h-5"/> Hubungi Admin via WhatsApp
-                                        </a>
-                                        {adminWhatsApp && (
-                                            <p className="text-xs text-center text-slate-500 mt-2">
-                                                <Phone className="w-3 h-3 inline mr-1"/>
-                                                +{adminWhatsApp}
-                                            </p>
-                                        )}
+                                            Tutup
+                                        </button>
                                     </div>
-
-                                    {/* Tombol Tutup */}
-                                    <button 
-                                        onClick={() => setShowPackageModal(false)}
-                                        className="w-full py-3 border-2 border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 flex items-center justify-center gap-2 transition-all"
-                                    >
-                                        Tutup
-                                    </button>
                                 </div>
                             </div>
-                        </div>
                     )}
                 </div>
             );
