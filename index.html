@@ -1941,6 +1941,9 @@ const SessionProvider = ({ children }) => {
                 // Priority: Role Access (tenant level) -> Store Config (store level)
                 if (roleAccess && roleAccess[featureKey] === false) return false;
                 if (userProfile?.role === 'owner') return true; // Owner always has access unless explicitly locked
+                if (storeConfig && storeConfig[featureKey] === false) return false;
+                return true;
+            };
 
             // Subscription status calculation
             const subscriptionStatus = useMemo(() => {
