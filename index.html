@@ -10295,7 +10295,8 @@ RINGKASAN KPI:
                                         name: formData.get('name'),
                                         phone: formData.get('phone'),
                                         address: formData.get('address'),
-                                        phoneType: formData.get('phoneType')
+                                        phoneType: formData.get('phoneType'),
+                                        customerType: formData.get('customerType')
                                     });
                                 }} className="space-y-4">
                                     <div>
@@ -10313,6 +10314,13 @@ RINGKASAN KPI:
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Alamat</label>
                                         <textarea name="address" defaultValue={modal.address || ''} className="w-full border p-2 rounded-lg text-sm focus:outline-blue-500 resize-none" rows="3"></textarea>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tipe Pelanggan</label>
+                                        <select name="customerType" defaultValue={modal.customerType || 'sales'} className="w-full border p-2 rounded-lg text-sm focus:outline-blue-500">
+                                            <option value="sales">🛒 Pelanggan Penjualan</option>
+                                            <option value="service">📱 Pelanggan Service</option>
+                                        </select>
                                     </div>
                                     <div className="flex gap-3 mt-6">
                                         <button type="button" onClick={() => setModal(null)} className="flex-1 py-3 border rounded-xl font-bold">Batal</button>
