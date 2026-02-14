@@ -8356,7 +8356,7 @@ RINGKASAN KPI:
             const [manualItem, setManualItem] = useState({name: '', buyPrice: 0, sellPrice: 0, qty: 1});
             const [showManualItemForm, setShowManualItemForm] = useState(false);
             const [editingPrice, setEditingPrice] = useState(null);
-            const [newCustomerForm, setNewCustomerForm] = useState({name: '', phone: '', address: ''});
+            const [newCustomerForm, setNewCustomerForm] = useState({name: '', phone: '', address: '', customerType: 'sales'});
             const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
             
             // Load custom categories and subcategories from Firestore real-time
@@ -8503,12 +8503,13 @@ RINGKASAN KPI:
                         name: newCustomerForm.name,
                         phone: newCustomerForm.phone || '',
                         address: newCustomerForm.address || '',
+                        customerType: newCustomerForm.customerType || 'sales',
                         createdAt: serverTimestamp()
                     });
                     
                     // Set nama pelanggan ke form checkout
                     setCustomerName(newCustomerForm.name);
-                    setNewCustomerForm({name: '', phone: '', address: ''});
+                    setNewCustomerForm({name: '', phone: '', address: '', customerType: 'sales'});
                     setShowNewCustomerForm(false);
                     alert('✅ Pelanggan baru berhasil ditambahkan!');
                 } catch (err) {
@@ -8877,7 +8878,6 @@ RINGKASAN KPI:
                                 <button key={t.id} onClick={() => { setTab(t.id); setTerm(''); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === t.id ? 'bg-blue-600 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}`}>{t.label}</button>
                             ))}
                         </div>
-                        <button onClick={() => setTab('cart')} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:bg-blue-700"><Plus className="w-5 h-5"/> Penjualan Baru</button>
                     </div>
 
                     {tab === 'cart' ? (
@@ -9372,6 +9372,17 @@ RINGKASAN KPI:
                                                 onChange={e => setNewCustomerForm({...newCustomerForm, address: e.target.value})}
                                                 className="w-full border border-slate-300 p-2 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
                                             />
+                                            <div>
+                                                <label className="text-xs font-bold text-emerald-900 mb-1 block">Tipe Pelanggan</label>
+                                                <select 
+                                                    value={newCustomerForm.customerType || 'sales'}
+                                                    onChange={e => setNewCustomerForm({...newCustomerForm, customerType: e.target.value})}
+                                                    className="w-full border border-slate-300 p-2 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+                                                >
+                                                    <option value="sales">🛒 Pelanggan Penjualan</option>
+                                                    <option value="service">📱 Pelanggan Service</option>
+                                                </select>
+                                            </div>
                                             <div className="flex gap-2">
                                                 <button 
                                                     type="button"
@@ -9384,7 +9395,7 @@ RINGKASAN KPI:
                                                     type="button"
                                                     onClick={() => {
                                                         setShowNewCustomerForm(false);
-                                                        setNewCustomerForm({name: '', phone: '', address: ''});
+                                                        setNewCustomerForm({name: '', phone: '', address: '', customerType: 'sales'});
                                                     }}
                                                     className="flex-1 bg-slate-300 text-slate-700 rounded-lg font-bold py-2 hover:bg-slate-400 transition-all text-sm"
                                                 >
@@ -10154,7 +10165,7 @@ RINGKASAN KPI:
                                             </td>
                                             <td className="p-4 text-center flex justify-center gap-2">
                                                 <button onClick={() => setHistoryModal(c)} className="text-purple-500 hover:bg-purple-50 p-2 rounded" title={customerTab === 'service' ? 'Lihat riwayat service' : 'Lihat riwayat pembelian'}><History className="w-4 h-4" /></button>
-                                                {c.dbRecord && <button onClick={() => setModal(c)} className="text-blue-500 hover:bg-blue-50 p-2 rounded"><Pencil className="w-4 h-4" /></button>}
+                                                <button onClick={() => setModal(c)} className="text-blue-500 hover:bg-blue-50 p-2 rounded" title="Edit pelanggan"><Pencil className="w-4 h-4" /></button>
                                                 <button onClick={(e) => { e.stopPropagation(); confirmDeleteCustomer(c); }} className="text-red-500 hover:bg-red-50 p-2 rounded" title="Hapus pelanggan"><Trash2 className="w-4 h-4" /></button>
                                             </td>
                                         </tr>
@@ -10217,11 +10228,9 @@ RINGKASAN KPI:
                                         <button onClick={() => setHistoryModal(c)} className="flex-1 bg-purple-50 text-purple-600 px-3 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1">
                                             <History className="w-3 h-3"/> Riwayat
                                         </button>
-                                        {c.dbRecord && (
-                                            <button onClick={() => setModal(c)} className="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1">
-                                                <Pencil className="w-3 h-3"/> Edit
-                                            </button>
-                                        )}
+                                        <button onClick={() => setModal(c)} className="flex-1 bg-blue-50 text-blue-600 px-3 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1">
+                                            <Pencil className="w-3 h-3"/> Edit
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); confirmDeleteCustomer(c); }} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1">
                                             <Trash2 className="w-3 h-3"/> Hapus
                                         </button>
