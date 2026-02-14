@@ -801,13 +801,13 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
-                    const CACHE_NAME = 'ifix-pro-v3';
+                    const CACHE_NAME = 'ifix-pro-v4';
                     const urlsToCache = [
                         '/logo-ifix.png'
                     ];
                     
                     self.addEventListener('install', e => {
-                        console.log('SW: Installing v3');
+                        console.log('SW: Installing v4');
                         e.waitUntil(
                             caches.open(CACHE_NAME).then(cache => {
                                 console.log('SW: Caching logo');
@@ -817,7 +817,7 @@
                     });
                     
                     self.addEventListener('activate', e => {
-                        console.log('SW: Activating v3');
+                        console.log('SW: Activating v4');
                         e.waitUntil(
                             caches.keys().then(cacheNames => {
                                 return Promise.all(
@@ -835,6 +835,12 @@
                     self.addEventListener('fetch', e => {
                         const url = new URL(e.request.url);
                         
+                        // BYPASS Service Worker completely for Firebase & external domains
+                        if (!url.origin.includes(self.location.origin)) {
+                            // Don't intercept external requests (Firebase, Google APIs, etc.)
+                            return;
+                        }
+                        
                         // NEVER cache HTML - always fetch from network
                         if (e.request.method === 'GET' && 
                             (e.request.destination === 'document' || 
@@ -842,7 +848,7 @@
                              url.pathname === '/' || 
                              url.pathname === '/index.html')) {
                             e.respondWith(
-                                fetch(e.request).catch(() => {
+                                fetch(e.request, { cache: 'no-store' }).catch(() => {
                                     return new Response(
                                         '<h1>Offline</h1><p>Anda sedang offline. Silakan coba lagi saat terhubung ke internet.</p>',
                                         { headers: { 'Content-Type': 'text/html' } }
@@ -867,10 +873,8 @@
                             return;
                         }
                         
-                        // Network-first for everything else (Firebase, API calls, etc.)
-                        e.respondWith(
-                            fetch(e.request).catch(() => caches.match(e.request))
-                        );
+                        // For everything else from same origin (if any), just fetch
+                        // Don't cache, don't interfere
                     });
                 `;
                 const swBlob = new Blob([swCode], { type: 'application/javascript' });
@@ -19943,6 +19947,7 @@ RINGKASAN KPI:
             const [rememberMe, setRememberMe] = useState(false);
             const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
+            const [showDebug, setShowDebug] = useState(false);
             
             // Detect PWA mode
             const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
@@ -19950,13 +19955,31 @@ RINGKASAN KPI:
 
             const handleAuth = async (e) => {
                 e.preventDefault();
+                
+                // Prevent double submission
+                if (loading) {
+                    console.log('Login already in progress...');
+                    return;
+                }
+                
                 setError('');
                 setLoading(true);
+                
+                console.log('🔐 Starting login process...');
+                console.log('📱 User Agent:', navigator.userAgent);
+                console.log('🌐 Online:', navigator.onLine);
+                console.log('📦 PWA Mode:', window.matchMedia('(display-mode: standalone)').matches);
+                
                 try {
                     const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+                    console.log('⚙️ Setting persistence:', rememberMe ? 'localStorage' : 'sessionStorage');
                     await setPersistence(auth, persistence);
+                    
+                    console.log('🔑 Attempting sign in...');
                     await signInWithEmailAndPassword(auth, email, password);
+                    console.log('✅ Sign in successful!');
                 } catch (err) {
+                    console.error('❌ Login error:', err.code, err.message);
                     let msg = err.message;
                     if (err.code === 'auth/invalid-credential') msg = "Email atau password salah.";
                     if (err.code === 'auth/user-not-found') msg = "Akun tidak ditemukan.";
@@ -19987,14 +20010,34 @@ RINGKASAN KPI:
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Email</label>
                                     <div className="relative">
-                                        <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-slate-300 p-3 pl-10 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="nama@email.com" required/>
+                                        <input 
+                                            type="email" 
+                                            value={email} 
+                                            onChange={e=>setEmail(e.target.value)} 
+                                            className="w-full border border-slate-300 p-3 pl-10 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none touch-manipulation" 
+                                            placeholder="nama@email.com" 
+                                            autoComplete="email"
+                                            inputMode="email"
+                                            autoCapitalize="off"
+                                            autoCorrect="off"
+                                            spellCheck="false"
+                                            required
+                                        />
                                         <UserPlus className="w-5 h-5 text-slate-400 absolute left-3 top-3.5"/>
                                     </div>
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Password</label>
                                     <div className="relative">
-                                        <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-slate-300 p-3 pl-10 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="******" required/>
+                                        <input 
+                                            type="password" 
+                                            value={password} 
+                                            onChange={e=>setPassword(e.target.value)} 
+                                            className="w-full border border-slate-300 p-3 pl-10 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none touch-manipulation" 
+                                            placeholder="******" 
+                                            autoComplete="current-password"
+                                            required
+                                        />
                                         <Key className="w-5 h-5 text-slate-400 absolute left-3 top-3.5"/>
                                     </div>
                                 </div>
@@ -20005,13 +20048,24 @@ RINGKASAN KPI:
                                         type="checkbox" 
                                         checked={rememberMe}
                                         onChange={(e) => setRememberMe(e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 touch-manipulation"
                                     />
-                                    <label htmlFor="remember-me" className="ml-2 text-sm font-medium text-slate-600 cursor-pointer">Ingat Saya</label>
+                                    <label htmlFor="remember-me" className="ml-2 text-sm font-medium text-slate-600 cursor-pointer touch-manipulation">Ingat Saya</label>
                                 </div>
 
-                                <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2">
-                                    {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Masuk Aplikasi'}
+                                <button 
+                                    type="submit" 
+                                    disabled={loading} 
+                                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 touch-manipulation active:scale-95"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin"/> 
+                                            <span>Memproses...</span>
+                                        </>
+                                    ) : (
+                                        'Masuk Aplikasi'
+                                    )}
                                 </button>
                             </form>
                             
@@ -20026,6 +20080,51 @@ RINGKASAN KPI:
                                     </p>
                                 </div>
                             )}
+                            
+                            {/* Debug Panel for Troubleshooting */}
+                            <div className="mt-4">
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowDebug(!showDebug)}
+                                    className="w-full text-xs text-slate-500 hover:text-slate-700 py-2 touch-manipulation"
+                                >
+                                    {showDebug ? '▼' : '▶'} Info Koneksi & Troubleshooting
+                                </button>
+                                
+                                {showDebug && (
+                                    <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">Status Internet:</span>
+                                            <span className={`font-bold ${navigator.onLine ? 'text-green-600' : 'text-red-600'}`}>
+                                                {navigator.onLine ? '✓ Online' : '✗ Offline'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">Mode PWA:</span>
+                                            <span className={`font-bold ${isPWA ? 'text-blue-600' : 'text-slate-600'}`}>
+                                                {isPWA ? '✓ Ya' : '✗ Tidak'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-600">Browser:</span>
+                                            <span className="font-mono text-[10px] text-slate-700">
+                                                {navigator.userAgent.includes('Chrome') ? 'Chrome' : 
+                                                 navigator.userAgent.includes('Safari') ? 'Safari' : 
+                                                 navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Other'}
+                                            </span>
+                                        </div>
+                                        <div className="pt-2 border-t border-slate-300 space-y-1">
+                                            <p className="font-bold text-slate-700">💡 Tips Login:</p>
+                                            <ul className="list-disc list-inside text-slate-600 space-y-1">
+                                                <li>Pastikan email sudah didaftarkan</li>
+                                                <li>Cek koneksi internet stabil</li>
+                                                <li>Coba reload halaman (pull down)</li>
+                                                <li>Hapus cache browser jika masih error</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                             
                             <div className="mt-6 pt-6 border-t border-slate-100 text-center">
                                 <p className="text-xs text-slate-400">Pastikan email Anda telah didaftarkan oleh Admin/Owner toko Anda.</p>
