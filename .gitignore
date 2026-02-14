@@ -3,6 +3,9 @@ netlify-deploy*.zip
 netlify-final.zip
 .netlify/
 
+# Auto-zip archives (except deploy-final.zip for deployment)
+POS-Sales-*.zip
+
 # Screenshots
 *.jpg
 *.jpeg
