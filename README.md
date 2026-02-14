@@ -1,2 +1,0 @@
-# POS-Sales
-app1
