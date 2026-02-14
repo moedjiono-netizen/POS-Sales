@@ -3321,19 +3321,32 @@ const BackupPage = () => {
                     <Zap className="w-6 h-6 text-yellow-500"/> Quick Actions
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                        onClick={() => setModal('backup')}
-                        className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left"
-                    >
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
-                                <Download className="w-6 h-6"/>
+                    {checkPermission('feature_backup_per_item') ? (
+                        <button
+                            onClick={() => setModal('backup')}
+                            className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left"
+                        >
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                                    <Download className="w-6 h-6"/>
+                                </div>
+                                <span className="text-xs font-bold text-purple-600 bg-purple-100 px-3 py-1 rounded-full">POPULAR</span>
                             </div>
-                            <span className="text-xs font-bold text-purple-600 bg-purple-100 px-3 py-1 rounded-full">POPULAR</span>
+                            <h4 className="font-bold text-lg mb-2 text-slate-800">Backup Per Item</h4>
+                            <p className="text-sm text-slate-600">Backup data per kategori (stok, pelanggan, servis, dll)</p>
+                        </button>
+                    ) : (
+                        <div className="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200 p-6 rounded-xl text-left opacity-80">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="w-12 h-12 bg-red-400 rounded-xl flex items-center justify-center text-white">
+                                    <Lock className="w-6 h-6"/>
+                                </div>
+                                <span className="text-xs font-bold text-red-600 bg-red-100 px-3 py-1 rounded-full">LOCKED</span>
+                            </div>
+                            <h4 className="font-bold text-lg mb-2 text-slate-600">Backup Per Item</h4>
+                            <p className="text-sm text-slate-500">Fitur dikunci oleh SuperAdmin</p>
                         </div>
-                        <h4 className="font-bold text-lg mb-2 text-slate-800">Backup Per Item</h4>
-                        <p className="text-sm text-slate-600">Backup data per kategori (stok, pelanggan, servis, dll)</p>
-                    </button>
+                    )}
                     
                     <button
                         className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left opacity-50 cursor-not-allowed"
