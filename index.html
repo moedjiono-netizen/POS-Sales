@@ -15,8 +15,8 @@
     <!-- Inline PWA Manifest -->
     <link id="manifest-placeholder" rel="manifest">
     
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grad)' rx='20'/%3E%3Ctext x='50' y='70' font-family='Arial' font-size='50' font-weight='bold' fill='white' text-anchor='middle'%3EiF%3C/text%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='180' height='180' fill='url(%23grad)' rx='40'/%3E%3Ctext x='90' y='120' font-family='Arial' font-size='80' font-weight='bold' fill='white' text-anchor='middle'%3EiF%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/png" href="/logo-ifix.png">
+    <link rel="apple-touch-icon" href="/logo-ifix.png">
     
     <script>
         // Generate inline manifest
@@ -30,14 +30,14 @@
             theme_color: "#2563eb",
             orientation: "any",
             icons: [{
-                src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='192' height='192' fill='url(%23grad)' rx='40'/%3E%3Ctext x='96' y='130' font-family='Arial, sans-serif' font-size='90' font-weight='bold' fill='white' text-anchor='middle'%3EiF%3C/text%3E%3C/svg%3E",
+                src: "/logo-ifix.png",
                 sizes: "192x192",
-                type: "image/svg+xml",
+                type: "image/png",
                 purpose: "any maskable"
             }, {
-                src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%232563eb;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' fill='url(%23grad)' rx='100'/%3E%3Ctext x='256' y='340' font-family='Arial, sans-serif' font-size='240' font-weight='bold' fill='white' text-anchor='middle'%3EiF%3C/text%3E%3C/svg%3E",
+                src: "/logo-ifix.png",
                 sizes: "512x512",
-                type: "image/svg+xml"
+                type: "image/png"
             }]
         };
         const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
@@ -794,19 +794,55 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
-                    const CACHE_NAME = 'ifix-pro-v1';
+                    const CACHE_NAME = 'ifix-pro-v2';
+                    const urlsToCache = [
+                        '/logo-ifix.png'
+                    ];
+                    
                     self.addEventListener('install', e => {
-                        console.log('SW: Installed');
-                        self.skipWaiting();
-                    });
-                    self.addEventListener('activate', e => {
-                        console.log('SW: Activated');
-                        self.clients.claim();
-                    });
-                    self.addEventListener('fetch', e => {
-                        e.respondWith(
-                            fetch(e.request).catch(() => caches.match(e.request))
+                        console.log('SW: Installing v2');
+                        e.waitUntil(
+                            caches.open(CACHE_NAME).then(cache => {
+                                console.log('SW: Caching logo');
+                                return cache.addAll(urlsToCache);
+                            }).then(() => self.skipWaiting())
                         );
+                    });
+                    
+                    self.addEventListener('activate', e => {
+                        console.log('SW: Activating v2');
+                        e.waitUntil(
+                            caches.keys().then(cacheNames => {
+                                return Promise.all(
+                                    cacheNames.map(cacheName => {
+                                        if (cacheName !== CACHE_NAME) {
+                                            console.log('SW: Deleting old cache:', cacheName);
+                                            return caches.delete(cacheName);
+                                        }
+                                    })
+                                );
+                            }).then(() => self.clients.claim())
+                        );
+                    });
+                    
+                    self.addEventListener('fetch', e => {
+                        // Cache-first strategy for logo, network-first for others
+                        if (e.request.url.includes('/logo-ifix.png')) {
+                            e.respondWith(
+                                caches.match(e.request).then(response => {
+                                    return response || fetch(e.request).then(fetchResponse => {
+                                        return caches.open(CACHE_NAME).then(cache => {
+                                            cache.put(e.request, fetchResponse.clone());
+                                            return fetchResponse;
+                                        });
+                                    });
+                                })
+                            );
+                        } else {
+                            e.respondWith(
+                                fetch(e.request).catch(() => caches.match(e.request))
+                            );
+                        }
                     });
                 `;
                 const swBlob = new Blob([swCode], { type: 'application/javascript' });
@@ -2749,11 +2785,11 @@ const KelengkapanItemsModal = ({ close, ownerId }) => {
     );
 };
 
-const BackupModal = ({ close }) => {
+// BackupModal untuk SuperAdmin (dengan pilihan owner)
+const BackupModalSuperAdmin = ({ close }) => {
     const [selectedOwner, setSelectedOwner] = useState(null);
     const [selectedCollection, setSelectedCollection] = useState('inventory');
     const [loading, setLoading] = useState(false);
-    const [backupData, setBackupData] = useState(null);
     const { data: owners } = useFirestoreCollection('owners');
 
     const collections = [
@@ -2768,7 +2804,7 @@ const BackupModal = ({ close }) => {
 
     const handleBackup = async () => {
         if (!selectedOwner) {
-            alert('Pilih owner terlebih dahulu!');
+            alert('❌ Pilih owner terlebih dahulu!');
             return;
         }
 
@@ -2787,8 +2823,6 @@ const BackupModal = ({ close }) => {
                 }
                 return value;
             }));
-
-            setBackupData(cleanData);
             
             // Download as JSON
             const blob = new Blob([JSON.stringify(cleanData, null, 2)], { type: 'application/json' });
@@ -2796,13 +2830,14 @@ const BackupModal = ({ close }) => {
             const a = document.createElement('a');
             a.href = url;
             const ownerName = owners.find(o => o.id === selectedOwner)?.name || 'Unknown';
+            const collectionName = collections.find(c => c.id === selectedCollection)?.name || selectedCollection;
             a.download = `backup_${selectedCollection}_${ownerName}_${new Date().toISOString().split('T')[0]}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            alert(`✅ Backup berhasil!\n\nData: ${data.length} item\nKoleksi: ${selectedCollection}\nOwner: ${ownerName}`);
+            alert(`✅ Backup berhasil!\n\n📋 Data: ${data.length} item\n📦 Kategori: ${collectionName}\n🏢 Owner: ${ownerName}\n📅 Tanggal: ${new Date().toLocaleDateString('id-ID')}`);
         } catch (error) {
             console.error('Backup error:', error);
             alert('❌ Gagal backup: ' + error.message);
@@ -2816,7 +2851,7 @@ const BackupModal = ({ close }) => {
             <div className="bg-slate-800 border border-slate-700 w-full max-w-2xl rounded-2xl p-6 shadow-2xl">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-xl text-white flex items-center gap-2">
-                        <Database className="w-5 h-5 text-blue-400"/> Backup Data per Item
+                        <Database className="w-5 h-5 text-blue-400"/> Backup Data per Item (SuperAdmin)
                     </h3>
                     <button onClick={close} className="text-slate-400 hover:text-white p-1">
                         <X className="w-5 h-5"/>
@@ -2849,7 +2884,7 @@ const BackupModal = ({ close }) => {
                                     onClick={() => setSelectedCollection(col.id)}
                                     className={`p-4 rounded-lg border-2 transition-all text-left ${
                                         selectedCollection === col.id 
-                                            ? 'bg-blue-600 border-blue-400 text-white' 
+                                            ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/50' 
                                             : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
                                     }`}
                                 >
@@ -2895,6 +2930,289 @@ const BackupModal = ({ close }) => {
                     </div>
                 </div>
             </div>
+        </div>
+    );
+};
+
+// BackupModal untuk Owner & Admin (dengan pilihan toko)
+const BackupModal = ({ close }) => {
+    const { activeOwner, activeStore, availableStores } = useContext(SessionContext);
+    const [selectedStore, setSelectedStore] = useState(activeStore?.id || 'all');
+    const [selectedCollection, setSelectedCollection] = useState('inventory');
+    const [loading, setLoading] = useState(false);
+
+    const collections = [
+        { id: 'inventory', name: 'Stok Barang', icon: '📦' },
+        { id: 'customers', name: 'Pelanggan', icon: '👥' },
+        { id: 'services', name: 'Riwayat Servis', icon: '📱' },
+        { id: 'sales', name: 'Riwayat Penjualan', icon: '🛒' },
+        { id: 'suppliers', name: 'Supplier', icon: '🚚' },
+        { id: 'employees', name: 'Pegawai', icon: '👔' },
+        { id: 'transactions', name: 'Transaksi Keuangan', icon: '💰' },
+    ];
+
+    const handleBackup = async () => {
+        if (!activeOwner?.id) {
+            alert('❌ Data owner tidak ditemukan!');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const collectionRef = collection(db, APP_COLLECTION_PREFIX, 'public', selectedCollection);
+            
+            // Query berdasarkan store yang dipilih
+            let q;
+            if (selectedStore === 'all') {
+                q = query(collectionRef, where('ownerId', '==', activeOwner.id));
+            } else {
+                q = query(collectionRef, where('ownerId', '==', activeOwner.id), where('storeId', '==', selectedStore));
+            }
+            
+            const snapshot = await getDocs(q);
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Convert Firestore timestamps to strings for JSON
+            const cleanData = JSON.parse(JSON.stringify(data, (key, value) => {
+                if (value && typeof value === 'object' && value.seconds) {
+                    return new Date(value.seconds * 1000).toISOString();
+                }
+                return value;
+            }));
+            
+            // Download as JSON
+            const blob = new Blob([JSON.stringify(cleanData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const ownerName = activeOwner.name || 'Unknown';
+            const storeName = selectedStore === 'all' ? 'All_Stores' : (availableStores.find(s => s.id === selectedStore)?.name || 'Store');
+            const collectionName = collections.find(c => c.id === selectedCollection)?.name || selectedCollection;
+            a.download = `backup_${selectedCollection}_${storeName}_${ownerName}_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`✅ Backup berhasil!\n\n📋 Data: ${data.length} item\n📦 Kategori: ${collectionName}\n🏢 Toko: ${storeName === 'All_Stores' ? 'Semua Toko' : storeName}\n🏢 Owner: ${ownerName}\n📅 Tanggal: ${new Date().toLocaleDateString('id-ID')}`);
+        } catch (error) {
+            console.error('Backup error:', error);
+            alert('❌ Gagal backup: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-slate-800 border border-slate-700 w-full max-w-2xl rounded-2xl p-6 shadow-2xl">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className="font-bold text-xl text-white flex items-center gap-2">
+                            <Database className="w-5 h-5 text-purple-400"/> Backup Data per Item
+                        </h3>
+                        <p className="text-sm text-slate-400 mt-1">Owner: <span className="text-white font-bold">{activeOwner?.name}</span></p>
+                    </div>
+                    <button onClick={close} className="text-slate-400 hover:text-white p-1">
+                        <X className="w-5 h-5"/>
+                    </button>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Select Store */}
+                    <div>
+                        <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">🏢 Pilih Toko/Cabang</label>
+                        <select 
+                            value={selectedStore} 
+                            onChange={(e) => setSelectedStore(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none"
+                        >
+                            <option value="all">📊 Semua Toko (All Stores)</option>
+                            {availableStores?.map(store => (
+                                <option key={store.id} value={store.id}>🏪 {store.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Select Collection */}
+                    <div>
+                        <label className="text-xs text-slate-400 font-bold uppercase mb-2 block">📋 Pilih Data yang akan di-Backup</label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {collections.map(col => (
+                                <button
+                                    key={col.id}
+                                    onClick={() => setSelectedCollection(col.id)}
+                                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                                        selectedCollection === col.id 
+                                            ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-900/50' 
+                                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                                    }`}
+                                >
+                                    <div className="text-2xl mb-2">{col.icon}</div>
+                                    <div className="text-xs font-bold">{col.name}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="bg-purple-900/30 border border-purple-500/30 p-4 rounded-lg">
+                        <h4 className="text-purple-300 font-bold text-sm mb-2 flex items-center gap-2">
+                            <Info className="w-4 h-4"/> Informasi Backup
+                        </h4>
+                        <ul className="text-sm text-purple-200 space-y-1">
+                            <li>• File akan diunduh dalam format JSON</li>
+                            <li>• Pilih "Semua Toko" untuk backup seluruh data atau pilih toko spesifik</li>
+                            <li>• Backup dapat digunakan untuk restore atau analisis data</li>
+                            <li>• File aman disimpan di komputer/device Anda</li>
+                        </ul>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={close} 
+                            className="flex-1 py-3 border border-slate-600 rounded-lg font-bold text-slate-400 hover:bg-slate-700"
+                        >
+                            Batal
+                        </button>
+                        <button 
+                            onClick={handleBackup}
+                            disabled={loading}
+                            className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-blue-700 flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <><Loader2 className="w-5 h-5 animate-spin"/> Memproses...</>
+                            ) : (
+                                <><Download className="w-5 h-5"/> Backup & Download</>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// BackupPage - Halaman khusus untuk Backup (untuk Admin & Owner)
+const BackupPage = () => {
+    const { user, activeOwner, activeStore, availableStores, checkPermission } = useContext(SessionContext);
+    const [modal, setModal] = useState(null);
+    const effectiveRole = user.role === 'superadmin' ? 'owner' : user.role;
+    
+    // Check permission untuk backup
+    if (!checkPermission('feature_backup')) {
+        return (
+            <div className="p-10 text-center text-red-500">
+                <Lock className="w-16 h-16 mx-auto mb-4"/>
+                <h3 className="font-bold text-xl mb-2">Akses Ditolak</h3>
+                <p className="text-slate-400">Fitur Backup dikunci oleh Owner/SuperAdmin</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8 max-w-4xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-8 rounded-2xl text-white shadow-xl">
+                <div className="flex items-center gap-4 mb-4">
+                    <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center">
+                        <Database className="w-8 h-8"/>
+                    </div>
+                    <div>
+                        <h2 className="text-3xl font-bold">Backup & Restore Data</h2>
+                        <p className="text-purple-100">Kelola backup data toko Anda dengan mudah</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                        <div className="text-2xl font-bold">{availableStores?.length || 0}</div>
+                        <div className="text-sm text-purple-100">Toko/Cabang</div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                        <div className="text-2xl font-bold">{activeOwner?.plan?.toUpperCase() || 'BASIC'}</div>
+                        <div className="text-sm text-purple-100">Plan Aktif</div>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                        <div className="text-2xl font-bold">{effectiveRole === 'owner' ? 'OWNER' : 'ADMIN'}</div>
+                        <div className="text-sm text-purple-100">Role Anda</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                <h3 className="font-bold text-xl mb-6 flex items-center gap-2 text-slate-800">
+                    <Zap className="w-6 h-6 text-yellow-500"/> Quick Actions
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                        onClick={() => setModal('backup')}
+                        className="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left"
+                    >
+                        <div className="flex items-start justify-between mb-3">
+                            <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                                <Download className="w-6 h-6"/>
+                            </div>
+                            <span className="text-xs font-bold text-purple-600 bg-purple-100 px-3 py-1 rounded-full">POPULAR</span>
+                        </div>
+                        <h4 className="font-bold text-lg mb-2 text-slate-800">Backup Per Item</h4>
+                        <p className="text-sm text-slate-600">Backup data per kategori (stok, pelanggan, servis, dll)</p>
+                    </button>
+                    
+                    <button
+                        className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left opacity-50 cursor-not-allowed"
+                        disabled
+                    >
+                        <div className="flex items-start justify-between mb-3">
+                            <div className="w-12 h-12 bg-slate-400 rounded-xl flex items-center justify-center text-white">
+                                <Upload className="w-6 h-6"/>
+                            </div>
+                            <span className="text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full">COMING SOON</span>
+                        </div>
+                        <h4 className="font-bold text-lg mb-2 text-slate-600">Restore Data</h4>
+                        <p className="text-sm text-slate-500">Upload file backup untuk restore data (Coming Soon)</p>
+                    </button>
+                </div>
+            </div>
+
+            {/* Info & Tips */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+                <div className="flex items-start gap-3">
+                    <Info className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0"/>
+                    <div>
+                        <h4 className="font-bold text-blue-900 mb-2">Tips Backup Data</h4>
+                        <ul className="text-sm text-blue-800 space-y-2">
+                            <li>• Lakukan backup data secara berkala (minimal 1x seminggu)</li>
+                            <li>• Simpan file backup di tempat aman (cloud storage, external hard disk)</li>
+                            <li>• Pastikan pilih toko yang benar sebelum backup</li>
+                            <li>• File backup dalam format JSON dapat dibuka dengan text editor</li>
+                            <li>• Nama file otomatis: backup_[kategori]_[toko]_[owner]_[tanggal].json</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {/* Plan Information */}
+            {activeOwner?.plan === 'basic' && (
+                <div className="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-6">
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-6 h-6 text-yellow-600 mt-1"/>
+                        <div>
+                            <h4 className="font-bold text-yellow-900 mb-2">⚠️ Basic Plan - Fitur Terbatas</h4>
+                            <p className="text-sm text-yellow-800 mb-3">
+                                Anda menggunakan Basic Plan. Fitur backup mungkin dibatasi. Upgrade ke Pro Plan untuk akses penuh.
+                            </p>
+                            <button className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-bold">
+                                Upgrade ke Pro
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal */}
+            {modal === 'backup' && <BackupModal close={() => setModal(null)} />}
         </div>
     );
 };
@@ -3562,7 +3880,7 @@ const SuperAdminDashboard = () => {
                          </div>
                      </div>
                      
-                     <main className="p-8 max-w-7xl mx-auto"> <div className="flex justify-between items-end mb-8"><div><h2 className="text-3xl font-bold mb-2">Daftar Tenant (Owner)</h2><p className="text-slate-400">Kelola bisnis dan hak akses setiap owner.</p></div><button onClick={()=>{setModal('create')}} className="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all hover:scale-105 shadow-lg shadow-purple-900/50"><Plus className="w-5 h-5"/> Buat Owner Baru</button></div> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {owners.map(owner => { const subStatus = getOwnerSubStatus(owner); return ( <div key={owner.id} className="bg-slate-800 border border-slate-700 rounded-2xl p-6 hover:border-purple-500 transition-all group relative overflow-hidden flex flex-col"> <div className="flex justify-between items-start mb-4 relative z-10"> <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xl text-purple-400 border border-slate-600">{owner.name?.charAt(0)}</div> <div className="flex gap-2"> <button onClick={()=>{handleEditClick(owner)}} className="bg-blue-900/50 hover:bg-blue-800 text-blue-300 p-2 rounded-lg transition-colors"><Pencil className="w-3 h-3"/></button> <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase pt-1.5 border ${owner.plan === 'pro' ? 'bg-purple-900/50 text-purple-300 border-purple-500/30' : 'bg-slate-700 text-slate-400 border-slate-600'}`}>{owner.plan}</span> </div> </div> <h3 className="text-xl font-bold mb-1">{owner.name}</h3><p className="text-slate-400 text-sm mb-3 flex items-center gap-2"><MessageCircle className="w-3 h-3"/> {owner.email}</p> <div className={`flex items-center justify-between p-3 rounded-lg mb-4 border ${subStatus.status === 'active' ? 'bg-green-900/30 border-green-500/30' : subStatus.status === 'expired' ? 'bg-red-900/30 border-red-500/30' : 'bg-yellow-900/30 border-yellow-500/30'}`}><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${subStatus.status === 'active' ? 'bg-green-400 animate-pulse' : subStatus.status === 'expired' ? 'bg-red-400' : 'bg-yellow-400'}`}></div><span className={`text-xs font-bold ${subStatus.status === 'active' ? 'text-green-300' : subStatus.status === 'expired' ? 'text-red-300' : 'text-yellow-300'}`}>{subStatus.status === 'active' ? `Aktif - ${subStatus.remainingDays} hari lagi` : subStatus.status === 'expired' ? 'Kedaluwarsa' : 'Belum Diaktifkan'}</span></div><div className="flex gap-1">{subStatus.status === 'active' && <button onClick={() => revokeSubscription(owner)} className="px-2 py-1 rounded text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white" title="Nonaktifkan"><Lock className="w-3 h-3 inline mr-1"/>Nonaktifkan</button>}{subStatus.status === 'active' && <button onClick={() => setSubModal({type: 'activate', owner})} className="px-2 py-1 rounded text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white">Perpanjang</button>}{subStatus.status !== 'active' && <button onClick={() => setSubModal({type: 'activate', owner})} className="px-2 py-1 rounded text-[10px] font-bold bg-green-600 hover:bg-green-700 text-white animate-pulse">Aktifkan</button>}</div></div><div className="grid grid-cols-4 gap-2 mb-4"><button onClick={() => { setSelectedOwner(owner); setModal('access'); }} className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors border border-slate-600"><Key className="w-3 h-3"/> Akses</button><button onClick={() => { setSelectedOwner(owner); setModal('qcItems'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors"><ShieldCheck className="w-3 h-3"/> QC</button><button onClick={() => { setSelectedOwner(owner); setModal('kelengkapanItems'); }} className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors"><CheckCircle className="w-3 h-3"/> Lengkap</button><button onClick={() => setSubModal({type: 'message', owner})} className="bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors" title="Kirim Pesan ke Owner"><MessageCircle className="w-3 h-3"/> Pesan</button></div><button onClick={() => enterTenantContext(owner.id)} className="bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-colors mb-2"><Eye className="w-3 h-3"/> Masuk (Spy)</button> <button onClick={() => deleteTenant(owner.id, owner.name)} className="mt-auto w-full py-2 bg-red-900/30 text-red-400 border border-red-900/50 hover:bg-red-900/50 rounded-lg text-xs font-bold flex items-center justify-center gap-2"><Trash2 className="w-3 h-3"/> Hapus Tenant</button> </div> ); })} </div> </main> { (modal === 'create' || modal === 'edit') && ( <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4"> <div className="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl"> <h3 className="font-bold text-xl mb-6 text-white">{modal === 'create' ? 'Registrasi Owner Baru' : 'Edit Data Owner'}</h3> <form onSubmit={modal === 'create' ? createOwner : updateOwner} className="space-y-4"> <input name="name" defaultValue={selectedOwner?.name} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Nama Bisnis / Toko" required/> <input name="ownerName" defaultValue={selectedOwnerUser?.name} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Nama Pemilik" required/> <input name="email" type="email" defaultValue={selectedOwner?.email} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Email Login Owner" required/> {modal === 'create' && <input name="password" type="password" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Password Login (Min 6 Karakter)" required minLength="6"/>} <div className="grid grid-cols-1 gap-2"> <label className="text-xs text-slate-400 font-bold uppercase">Pilih Paket Langganan</label> <select name="plan" defaultValue={selectedOwner?.plan || 'basic'} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-purple-500 outline-none"> <option value="basic">Basic Plan (Max 1 Cabang, No Backup)</option> <option value="pro">Pro Plan (Unlimited, Full Akses)</option> </select> </div> <div className="flex gap-3 mt-6"> <button type="button" onClick={()=>{setModal(null); setSelectedOwner(null); setSelectedOwnerUser(null);}} className="flex-1 py-3 border border-slate-600 rounded-lg font-bold text-slate-400 hover:bg-slate-700">Batal</button> <button disabled={loading} className="flex-1 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 shadow-lg shadow-purple-900/50 flex items-center justify-center gap-2"> {loading && <Loader2 className="w-4 h-4 animate-spin"/>} {modal === 'create' ? 'Buat Tenant' : 'Simpan Perubahan'} </button> </div> </form> </div> </div> ) } {modal === 'access' && selectedOwner && ( <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-2"><div className="bg-slate-800 border border-slate-700 w-full max-w-[98vw] rounded-2xl shadow-2xl h-[96vh] overflow-hidden flex flex-col"><div className="flex items-center justify-between gap-3 p-6 border-b border-slate-700 bg-slate-750"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white text-lg">{selectedOwner.name.charAt(0)}</div><div><h3 className="font-bold text-lg text-white">{selectedOwner.name}</h3><p className="text-xs text-purple-300">Pengaturan Hak Akses Tenant - Kontrol Fitur & Menu</p></div></div><button type="button" onClick={()=>setModal(null)} className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-slate-700 rounded-lg"><X className="w-5 h-5"/></button></div><div className="px-6 pt-4"><p className="text-slate-400 text-sm bg-slate-900/50 p-3 rounded-lg border border-slate-700"><span className="text-yellow-400 font-bold">⚠️ PERHATIAN:</span> Fitur yang Anda matikan akan <strong>terkunci permanen</strong> untuk Owner dan seluruh karyawannya.</p></div><form onSubmit={updateAccess} className="flex-1 overflow-y-auto p-6 space-y-6"><div className="space-y-4"><div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4"><h4 className="font-bold text-blue-300 mb-3 flex items-center gap-2"><LayoutDashboard className="w-4 h-4"/> MENU UTAMA</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_dashboard', label: '📊 Dashboard'},{id: 'menu_report', label: '📈 Laporan'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div></div></label>))}</div></div><div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4"><h4 className="font-bold text-green-300 mb-3 flex items-center gap-2"><Smartphone className="w-4 h-4"/> MENU TRANSAKSI</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_service', label: '📱 Servis HP'},{id: 'menu_sales', label: '🛒 Penjualan'},{id: 'menu_purchase', label: '🛍️ Pembelian'},{id: 'menu_return_sales', label: '↩️ Retur Penjualan'},{id: 'menu_return_purchase', label: '↪️ Retur Pembelian'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div></div></label>))}</div></div><div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4"><h4 className="font-bold text-yellow-300 mb-3 flex items-center gap-2"><Wallet className="w-4 h-4"/> MENU KEUANGAN</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_payable', label: '📤 Utang'},{id: 'menu_receivable', label: '📥 Piutang'},{id: 'menu_cash', label: '💵 Kas'},{id: 'menu_finance', label: '💳 Laporan Keuangan'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-600"></div></div></label>))}</div></div><div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4"><h4 className="font-bold text-purple-300 mb-3 flex items-center gap-2"><Box className="w-4 h-4"/> MENU INVENTORY & DATA</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_inventory', label: '📦 Stok Barang'},{id: 'menu_supplier', label: '🚚 Supplier'},{id: 'menu_customers', label: '👥 Pelanggan'},{id: 'menu_hr', label: '👔 HR & Payroll'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div></div></label>))}</div></div><div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4"><h4 className="font-bold text-red-300 mb-3 flex items-center gap-2"><Settings className="w-4 h-4"/> MENU ADMIN</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_users', label: '👨 Pegawai'},{id: 'menu_settings', label: '⚙️ Pengaturan'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div></div></label>))}</div></div><div className="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4"><h4 className="font-bold text-cyan-300 mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4"/> FITUR & AKSI</h4><div className="grid grid-cols-1 gap-3">{[{id: 'feature_service_edit', label: '✏️ Edit Servis'},{id: 'feature_sales_edit', label: '✏️ Edit Penjualan'},{id: 'feature_inventory_edit', label: '✏️ Edit Inventory'},{id: 'feature_customer_edit', label: '✏️ Edit Pelanggan'},{id: 'feature_employee_edit', label: '✏️ Edit Pegawai'},{id: 'feature_finance_edit', label: '✏️ Edit Keuangan'},{id: 'feature_print', label: '🖨️ Cetak Invoice'},{id: 'feature_share', label: '💬 Share WhatsApp'},{id: 'feature_delete', label: '🗑️ Hapus Data'},{id: 'feature_stock_add', label: '➕ Tambah Stok'},{id: 'feature_backup', label: '💾 Backup Data'},{id: 'feature_import_export', label: '📤 Import/Export'},{id: 'feature_multi_branch', label: '🏢 Multi Cabang'},{id: 'feature_qc_checklist', label: '✅ QC Checklist'},{id: 'feature_kelengkapan', label: '📋 Kelengkapan Item'},{id: 'feature_accounting', label: '📊 Akuntansi'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div></div></label>))}</div></div></div><div className="flex gap-3 pt-4 border-t border-slate-700"><button type="button" onClick={()=>setModal(null)} className="flex-1 py-3 border border-slate-600 rounded-lg font-bold text-slate-400 hover:bg-slate-700 text-sm">Batal</button><button className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4"/>Simpan Hak Akses</button></div></form></div></div> )} {modal === 'plan' && <PlanConfigModal close={()=>setModal(null)} />} {modal === 'masterKelengkapan' && <MasterKelengkapanModal close={()=>setModal(null)} />} {modal === 'qcItems' && <QCFunctionalItemsModal close={()=>setModal(null)} ownerId={selectedOwner?.id} />} {modal === 'kelengkapanItems' && <KelengkapanItemsModal close={()=>setModal(null)} ownerId={selectedOwner?.id} />} {modal === 'backup' && <BackupModal close={()=>setModal(null)} />}
+                     <main className="p-8 max-w-7xl mx-auto"> <div className="flex justify-between items-end mb-8"><div><h2 className="text-3xl font-bold mb-2">Daftar Tenant (Owner)</h2><p className="text-slate-400">Kelola bisnis dan hak akses setiap owner.</p></div><button onClick={()=>{setModal('create')}} className="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all hover:scale-105 shadow-lg shadow-purple-900/50"><Plus className="w-5 h-5"/> Buat Owner Baru</button></div> <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {owners.map(owner => { const subStatus = getOwnerSubStatus(owner); return ( <div key={owner.id} className="bg-slate-800 border border-slate-700 rounded-2xl p-6 hover:border-purple-500 transition-all group relative overflow-hidden flex flex-col"> <div className="flex justify-between items-start mb-4 relative z-10"> <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xl text-purple-400 border border-slate-600">{owner.name?.charAt(0)}</div> <div className="flex gap-2"> <button onClick={()=>{handleEditClick(owner)}} className="bg-blue-900/50 hover:bg-blue-800 text-blue-300 p-2 rounded-lg transition-colors"><Pencil className="w-3 h-3"/></button> <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase pt-1.5 border ${owner.plan === 'pro' ? 'bg-purple-900/50 text-purple-300 border-purple-500/30' : 'bg-slate-700 text-slate-400 border-slate-600'}`}>{owner.plan}</span> </div> </div> <h3 className="text-xl font-bold mb-1">{owner.name}</h3><p className="text-slate-400 text-sm mb-3 flex items-center gap-2"><MessageCircle className="w-3 h-3"/> {owner.email}</p> <div className={`flex items-center justify-between p-3 rounded-lg mb-4 border ${subStatus.status === 'active' ? 'bg-green-900/30 border-green-500/30' : subStatus.status === 'expired' ? 'bg-red-900/30 border-red-500/30' : 'bg-yellow-900/30 border-yellow-500/30'}`}><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${subStatus.status === 'active' ? 'bg-green-400 animate-pulse' : subStatus.status === 'expired' ? 'bg-red-400' : 'bg-yellow-400'}`}></div><span className={`text-xs font-bold ${subStatus.status === 'active' ? 'text-green-300' : subStatus.status === 'expired' ? 'text-red-300' : 'text-yellow-300'}`}>{subStatus.status === 'active' ? `Aktif - ${subStatus.remainingDays} hari lagi` : subStatus.status === 'expired' ? 'Kedaluwarsa' : 'Belum Diaktifkan'}</span></div><div className="flex gap-1">{subStatus.status === 'active' && <button onClick={() => revokeSubscription(owner)} className="px-2 py-1 rounded text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white" title="Nonaktifkan"><Lock className="w-3 h-3 inline mr-1"/>Nonaktifkan</button>}{subStatus.status === 'active' && <button onClick={() => setSubModal({type: 'activate', owner})} className="px-2 py-1 rounded text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white">Perpanjang</button>}{subStatus.status !== 'active' && <button onClick={() => setSubModal({type: 'activate', owner})} className="px-2 py-1 rounded text-[10px] font-bold bg-green-600 hover:bg-green-700 text-white animate-pulse">Aktifkan</button>}</div></div><div className="grid grid-cols-4 gap-2 mb-4"><button onClick={() => { setSelectedOwner(owner); setModal('access'); }} className="bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors border border-slate-600"><Key className="w-3 h-3"/> Akses</button><button onClick={() => { setSelectedOwner(owner); setModal('qcItems'); }} className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors"><ShieldCheck className="w-3 h-3"/> QC</button><button onClick={() => { setSelectedOwner(owner); setModal('kelengkapanItems'); }} className="bg-cyan-600 hover:bg-cyan-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors"><CheckCircle className="w-3 h-3"/> Lengkap</button><button onClick={() => setSubModal({type: 'message', owner})} className="bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition-colors" title="Kirim Pesan ke Owner"><MessageCircle className="w-3 h-3"/> Pesan</button></div><button onClick={() => enterTenantContext(owner.id)} className="bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-colors mb-2"><Eye className="w-3 h-3"/> Masuk (Spy)</button> <button onClick={() => deleteTenant(owner.id, owner.name)} className="mt-auto w-full py-2 bg-red-900/30 text-red-400 border border-red-900/50 hover:bg-red-900/50 rounded-lg text-xs font-bold flex items-center justify-center gap-2"><Trash2 className="w-3 h-3"/> Hapus Tenant</button> </div> ); })} </div> </main> { (modal === 'create' || modal === 'edit') && ( <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4"> <div className="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl"> <h3 className="font-bold text-xl mb-6 text-white">{modal === 'create' ? 'Registrasi Owner Baru' : 'Edit Data Owner'}</h3> <form onSubmit={modal === 'create' ? createOwner : updateOwner} className="space-y-4"> <input name="name" defaultValue={selectedOwner?.name} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Nama Bisnis / Toko" required/> <input name="ownerName" defaultValue={selectedOwnerUser?.name} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Nama Pemilik" required/> <input name="email" type="email" defaultValue={selectedOwner?.email} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Email Login Owner" required/> {modal === 'create' && <input name="password" type="password" className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white placeholder-slate-500 focus:border-purple-500 outline-none" placeholder="Password Login (Min 6 Karakter)" required minLength="6"/>} <div className="grid grid-cols-1 gap-2"> <label className="text-xs text-slate-400 font-bold uppercase">Pilih Paket Langganan</label> <select name="plan" defaultValue={selectedOwner?.plan || 'basic'} className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-purple-500 outline-none"> <option value="basic">Basic Plan (Max 1 Cabang, No Backup)</option> <option value="pro">Pro Plan (Unlimited, Full Akses)</option> </select> </div> <div className="flex gap-3 mt-6"> <button type="button" onClick={()=>{setModal(null); setSelectedOwner(null); setSelectedOwnerUser(null);}} className="flex-1 py-3 border border-slate-600 rounded-lg font-bold text-slate-400 hover:bg-slate-700">Batal</button> <button disabled={loading} className="flex-1 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 shadow-lg shadow-purple-900/50 flex items-center justify-center gap-2"> {loading && <Loader2 className="w-4 h-4 animate-spin"/>} {modal === 'create' ? 'Buat Tenant' : 'Simpan Perubahan'} </button> </div> </form> </div> </div> ) } {modal === 'access' && selectedOwner && ( <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-2"><div className="bg-slate-800 border border-slate-700 w-full max-w-[98vw] rounded-2xl shadow-2xl h-[96vh] overflow-hidden flex flex-col"><div className="flex items-center justify-between gap-3 p-6 border-b border-slate-700 bg-slate-750"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-white text-lg">{selectedOwner.name.charAt(0)}</div><div><h3 className="font-bold text-lg text-white">{selectedOwner.name}</h3><p className="text-xs text-purple-300">Pengaturan Hak Akses Tenant - Kontrol Fitur & Menu</p></div></div><button type="button" onClick={()=>setModal(null)} className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-slate-700 rounded-lg"><X className="w-5 h-5"/></button></div><div className="px-6 pt-4"><p className="text-slate-400 text-sm bg-slate-900/50 p-3 rounded-lg border border-slate-700"><span className="text-yellow-400 font-bold">⚠️ PERHATIAN:</span> Fitur yang Anda matikan akan <strong>terkunci permanen</strong> untuk Owner dan seluruh karyawannya.</p></div><form onSubmit={updateAccess} className="flex-1 overflow-y-auto p-6 space-y-6"><div className="space-y-4"><div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4"><h4 className="font-bold text-blue-300 mb-3 flex items-center gap-2"><LayoutDashboard className="w-4 h-4"/> MENU UTAMA</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_dashboard', label: '📊 Dashboard'},{id: 'menu_report', label: '📈 Laporan'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div></div></label>))}</div></div><div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4"><h4 className="font-bold text-green-300 mb-3 flex items-center gap-2"><Smartphone className="w-4 h-4"/> MENU TRANSAKSI</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_service', label: '📱 Servis HP'},{id: 'menu_sales', label: '🛒 Penjualan'},{id: 'menu_purchase', label: '🛍️ Pembelian'},{id: 'menu_return_sales', label: '↩️ Retur Penjualan'},{id: 'menu_return_purchase', label: '↪️ Retur Pembelian'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div></div></label>))}</div></div><div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4"><h4 className="font-bold text-yellow-300 mb-3 flex items-center gap-2"><Wallet className="w-4 h-4"/> MENU KEUANGAN</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_payable', label: '📤 Utang'},{id: 'menu_receivable', label: '📥 Piutang'},{id: 'menu_cash', label: '💵 Kas'},{id: 'menu_finance', label: '💳 Laporan Keuangan'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-600"></div></div></label>))}</div></div><div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4"><h4 className="font-bold text-purple-300 mb-3 flex items-center gap-2"><Box className="w-4 h-4"/> MENU INVENTORY & DATA</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_inventory', label: '📦 Stok Barang'},{id: 'menu_supplier', label: '🚚 Supplier'},{id: 'menu_customers', label: '👥 Pelanggan'},{id: 'menu_hr', label: '👔 HR & Payroll'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div></div></label>))}</div></div><div className="bg-red-900/20 border border-red-500/30 rounded-lg p-4"><h4 className="font-bold text-red-300 mb-3 flex items-center gap-2"><Settings className="w-4 h-4"/> MENU ADMIN</h4><div className="grid grid-cols-1 gap-3">{[{id: 'menu_users', label: '👨 Pegawai'},{id: 'menu_settings', label: '⚙️ Pengaturan'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div></div></label>))}</div></div><div className="bg-cyan-900/20 border border-cyan-500/30 rounded-lg p-4"><h4 className="font-bold text-cyan-300 mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4"/> FITUR & AKSI</h4><div className="grid grid-cols-1 gap-3">{[{id: 'feature_service_edit', label: '✏️ Edit Servis'},{id: 'feature_sales_edit', label: '✏️ Edit Penjualan'},{id: 'feature_inventory_edit', label: '✏️ Edit Inventory'},{id: 'feature_customer_edit', label: '✏️ Edit Pelanggan'},{id: 'feature_employee_edit', label: '✏️ Edit Pegawai'},{id: 'feature_finance_edit', label: '✏️ Edit Keuangan'},{id: 'feature_print', label: '🖨️ Cetak Invoice'},{id: 'feature_share', label: '💬 Share WhatsApp'},{id: 'feature_delete', label: '🗑️ Hapus Data'},{id: 'feature_stock_add', label: '➕ Tambah Stok'},{id: 'feature_backup', label: '💾 Backup Data'},{id: 'feature_import_export', label: '📤 Import/Export'},{id: 'feature_multi_branch', label: '🏢 Multi Cabang'},{id: 'feature_qc_checklist', label: '✅ QC Checklist'},{id: 'feature_kelengkapan', label: '📋 Kelengkapan Item'},{id: 'feature_accounting', label: '📊 Akuntansi'}].map(item => (<label key={item.id} className="flex items-center justify-between p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-slate-500 cursor-pointer group"><span className="text-slate-300 font-medium group-hover:text-white transition-colors text-sm">{item.label}</span><div className="relative flex items-center"><input type="checkbox" name={item.id} defaultChecked={selectedOwner.accessRights?.[item.id] !== false} className="peer sr-only"/><div className="w-10 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div></div></label>))}</div></div></div><div className="flex gap-3 pt-4 border-t border-slate-700"><button type="button" onClick={()=>setModal(null)} className="flex-1 py-3 border border-slate-600 rounded-lg font-bold text-slate-400 hover:bg-slate-700 text-sm">Batal</button><button className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 text-sm flex items-center justify-center gap-2"><Save className="w-4 h-4"/>Simpan Hak Akses</button></div></form></div></div> )} {modal === 'plan' && <PlanConfigModal close={()=>setModal(null)} />} {modal === 'masterKelengkapan' && <MasterKelengkapanModal close={()=>setModal(null)} />} {modal === 'qcItems' && <QCFunctionalItemsModal close={()=>setModal(null)} ownerId={selectedOwner?.id} />} {modal === 'kelengkapanItems' && <KelengkapanItemsModal close={()=>setModal(null)} ownerId={selectedOwner?.id} />} {modal === 'backup' && <BackupModalSuperAdmin close={()=>setModal(null)} />}
 
                     {/* Subscription Settings Modal */}
                     {subModal === 'settings' && (
@@ -7713,15 +8031,21 @@ RINGKASAN KPI:
             // Extract unique categories from inventory
             const invCategories = [...new Set((inventory || []).map(i => i.category).filter(c => c))];
             const defaultCategories = ['Sparepart', 'Aksesori', 'Tools', 'Lainnya'];
-            const productCategories = [...new Set([...invCategories, ...defaultCategories, ...customCategories])];
             
-            // Filter products by category + sub-category + search + stock
+            // Tampilkan semua kategori termasuk yang stoknya 0
+            const categoriesWithStock = [...new Set((inventory || [])
+                .filter(i => i.category) // Tampilkan semua kategori
+                .map(i => i.category))]; 
+            
+            // Gabungkan dengan custom categories jika ada di inventory
+            const productCategories = [...new Set([...categoriesWithStock])];
+            
+            // Filter products by category + sub-category + search (tanpa filter stock)
             const displayedProducts = (inventory || []).filter(i => {
                 const matchSearch = i.name?.toLowerCase().includes(searchBarang.toLowerCase());
                 const matchCategory = !selectedCategory || i.category === selectedCategory;
                 const matchSubCategory = !selectedSubCategory || i.subCategory === selectedSubCategory;
-                const hasStock = i.stock > 0;
-                return matchSearch && matchCategory && matchSubCategory && hasStock;
+                return matchSearch && matchCategory && matchSubCategory;
             });
 
             // Pagination untuk produk
@@ -7752,9 +8076,19 @@ RINGKASAN KPI:
             };
 
             const addToCart = (item) => {
+                // Warning jika stok 0 atau kurang
+                if (item.stock <= 0) {
+                    if (!confirm(`⚠️ Stok ${item.name} saat ini ${item.stock || 0} unit.\n\nTetap tambahkan ke keranjang?`)) {
+                        return;
+                    }
+                }
+                
                 const existing = cart.find(c => c.id === item.id);
                 if (existing) {
-                    if (existing.qty < item.stock) {
+                    if (item.stock > 0 && existing.qty < item.stock) {
+                        setCart(cart.map(c => c.id === item.id ? {...c, qty: c.qty + 1} : c));
+                    } else if (item.stock <= 0) {
+                        // Izinkan tambah qty meskipun stok 0 (dengan warning sebelumnya)
                         setCart(cart.map(c => c.id === item.id ? {...c, qty: c.qty + 1} : c));
                     } else {
                         alert(`Stok ${item.name} hanya ${item.stock} unit`);
@@ -8179,7 +8513,7 @@ RINGKASAN KPI:
                                                         <option value="">📦 Semua Kategori ({displayedProducts.length})</option>
                                                         {productCategories.map(cat => (
                                                             <option key={cat} value={cat}>
-                                                                📁 {cat} ({(inventory || []).filter(i => i.category === cat && i.stock > 0).length})
+                                                                📁 {cat} ({(inventory || []).filter(i => i.category === cat).length})
                                                             </option>
                                                         ))}
                                                     </select>
@@ -8215,7 +8549,7 @@ RINGKASAN KPI:
                                         <div className="space-y-2 p-4 min-h-[450px]">
                                             {paginatedProducts.length > 0 ? (
                                                 paginatedProducts.map(item => (
-                                                    <button key={item.id} onClick={() => addToCart(item)} className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-between group">
+                                                    <button key={item.id} onClick={() => addToCart(item)} className={`w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between group ${item.stock <= 0 ? 'border-red-300 bg-red-50 hover:border-red-500' : 'border-slate-200 hover:border-blue-500 hover:bg-blue-50'}`}>
                                                         <div className="flex-1">
                                                             <p className="font-bold text-slate-800">{item.name}</p>
                                                             <div className="flex gap-1 flex-wrap mt-0.5">
@@ -8225,10 +8559,13 @@ RINGKASAN KPI:
                                                                 {item.subCategory && (
                                                                     <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded">→ {item.subCategory}</span>
                                                                 )}
+                                                                {item.stock <= 0 && (
+                                                                    <span className="text-[10px] text-red-600 font-bold bg-red-100 px-1.5 py-0.5 rounded">⚠️ STOK HABIS</span>
+                                                                )}
                                                             </div>
-                                                            <p className="text-xs text-slate-500">Stok: {item.stock} | Harga: {formatCurrency(item.sellPrice)}</p>
+                                                            <p className={`text-xs ${item.stock <= 0 ? 'text-red-600 font-bold' : 'text-slate-500'}`}>Stok: {item.stock} | Harga: {formatCurrency(item.sellPrice)}</p>
                                                         </div>
-                                                        <Plus className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                                                        <Plus className={`w-4 h-4 ${item.stock <= 0 ? 'text-red-400' : 'text-slate-400 group-hover:text-blue-600'}`} />
                                                     </button>
                                                 ))
                                             ) : (
@@ -9751,6 +10088,7 @@ RINGKASAN KPI:
           const [editModal, setEditModal] = useState(null);
           const [categoryModal, setCategoryModal] = useState(null);
           const [categoryFilter, setCategoryFilter] = useState('');
+          const [selectedSubCategory, setSelectedSubCategory] = useState('');
           const [searchTerm, setSearchTerm] = useState('');
           const [currentPage, setCurrentPage] = useState(1);
           const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -9874,6 +10212,7 @@ RINGKASAN KPI:
           
           // Search and filter
           const filteredInv = (categoryFilter ? inv.filter(i => i.category === categoryFilter) : inv)
+              .filter(i => !selectedSubCategory || i.subCategory === selectedSubCategory)
               .filter(i => !searchTerm || i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                   (i.brand && i.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
                   (i.supplier && i.supplier.toLowerCase().includes(searchTerm.toLowerCase())));
@@ -10090,7 +10429,12 @@ RINGKASAN KPI:
           // Reset page when search or filter changes
           useEffect(() => {
               setCurrentPage(1);
-          }, [categoryFilter, searchTerm]);
+          }, [categoryFilter, selectedSubCategory, searchTerm]);
+          
+          // Reset sub-category when category changes
+          useEffect(() => {
+              setSelectedSubCategory('');
+          }, [categoryFilter]);
           
           return (
             <div className="space-y-6">
@@ -10266,6 +10610,22 @@ RINGKASAN KPI:
                                   {allCategories.map(cat => (
                                       <option key={cat} value={cat}>
                                           {cat} ({inv.filter(i => i.category === cat).length})
+                                      </option>
+                                  ))}
+                              </select>
+                          </div>
+                          <div className="flex-1">
+                              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sub-Kategori</label>
+                              <select 
+                                  value={selectedSubCategory} 
+                                  onChange={e => setSelectedSubCategory(e.target.value)} 
+                                  disabled={!categoryFilter}
+                                  className="w-full border p-2.5 rounded-lg text-sm disabled:bg-gray-50 disabled:text-gray-400"
+                              >
+                                  <option value="">🏷️ Semua Sub-Kategori</option>
+                                  {categoryFilter && subCategories[categoryFilter]?.map(sub => (
+                                      <option key={sub} value={sub}>
+                                          {sub} ({inv.filter(i => i.category === categoryFilter && i.subCategory === sub).length})
                                       </option>
                                   ))}
                               </select>
@@ -11870,12 +12230,22 @@ RINGKASAN KPI:
                 });
             }
             
+            // Backup menu untuk Admin & Owner (dengan permission check)
+            if(effectiveRole === 'owner' || effectiveRole === 'admin') {
+                menuGroups.push({
+                    id: 'backup-menu',
+                    items: [
+                        { id: 'backup', label: 'Backup Data', icon: Database, permission: 'feature_backup' }
+                    ]
+                });
+            }
+            
             return (
                 <aside className={`bg-slate-900 text-slate-300 flex flex-col fixed left-0 top-0 bottom-0 z-50 shadow-2xl transition-transform duration-300 mobile-sidebar ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 w-64`}>
                     <div className="md:hidden absolute top-4 right-4 z-10"><button onClick={close} className="text-slate-400 hover:text-white"><X className="w-6 h-6"/></button></div>
                     {user.role === 'superadmin' && activeOwner && <div className="bg-purple-900 px-4 py-2 text-xs text-purple-200 font-bold flex justify-between items-center border-b border-purple-800 flex-shrink-0"><span>👁️ View: {activeOwner.name}</span><button onClick={()=>window.location.reload()} className="underline hover:text-white">Exit</button></div>}
                     <div className="p-6 flex-1 overflow-y-auto sidebar-scroll bg-slate-900">
-                        <div className="flex items-center gap-3 text-white mb-6"><div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-xl">iF</div><div><h1 className="font-bold text-lg leading-tight">iFix Pro</h1><p className="text-[10px] text-blue-400 uppercase tracking-widest">{activeOwner?.plan || 'Cloud'} Edition</p></div></div>
+                        <div className="flex items-center gap-3 text-white mb-6"><img src="/logo-ifix.png" alt="iFix Enterprise" className="w-10 h-10 rounded-lg object-contain"/><div><h1 className="font-bold text-lg leading-tight">iFix Pro</h1><p className="text-[10px] text-blue-400 uppercase tracking-widest">{activeOwner?.plan || 'Cloud'} Edition</p></div></div>
                         <div className="relative mb-6">
                             <button onClick={() => effectiveRole === 'owner' && setStoreMenuOpen(!storeMenuOpen)} className={`w-full bg-slate-800 p-3 rounded-xl flex items-center gap-3 border border-slate-700 ${effectiveRole === 'owner' ? 'hover:border-blue-500 cursor-pointer' : ''}`}>
                                 <div className="bg-blue-900 p-2 rounded-lg text-blue-400"><Store className="w-4 h-4"/></div><div className="flex-1 min-w-0 text-left"><p className="text-[10px] text-slate-500 uppercase font-bold">Lokasi Aktif</p><p className="text-sm font-bold text-white truncate">{!activeStore ? '📊 Semua Toko' : (activeStore.name || 'Loading...')}</p></div>{effectiveRole === 'owner' ? <ChevronDown className="w-4 h-4"/> : <Lock className="w-3 h-3"/>}
@@ -12360,7 +12730,15 @@ RINGKASAN KPI:
                              {activeOwner.plan === 'pro' && <span className="bg-purple-100 text-purple-600 px-3 py-1 rounded text-xs font-bold border border-purple-200 flex items-center gap-1"><Crown className="w-3 h-3"/> PRO PLAN</span>}
                          </div>
                          
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                             <div className={`bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col items-center text-center ${activeOwner.plan === 'basic' ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                                 <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-4"><Database className="w-6 h-6"/></div>
+                                 <h4 className="font-bold text-slate-800">Backup Per Item</h4>
+                                 <p className="text-xs text-slate-500 mt-2 mb-4">Backup data per kategori seperti stok, pelanggan, servis, dll.</p>
+                                 <button onClick={()=>setModal('backup')} disabled={saving} className="mt-auto w-full py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700 flex items-center justify-center gap-2">
+                                     <Download className="w-4 h-4"/> Backup Per Item
+                                 </button>
+                             </div>
                              <div className={`bg-slate-50 p-6 rounded-xl border border-slate-200 flex flex-col items-center text-center ${activeOwner.plan === 'basic' ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4"><HardDriveDownload className="w-6 h-6"/></div>
                                  <h4 className="font-bold text-slate-800">Download Backup</h4>
@@ -13829,6 +14207,7 @@ RINGKASAN KPI:
                      {modal === 'categoryItems' && <CategoryItemsModal close={()=>setModal(null)} ownerId={activeOwner?.id} storeId={activeStore?.id} />}
                      {modal === 'brandItems' && <BrandItemsModal close={()=>setModal(null)} ownerId={activeOwner?.id} />}
                      {modal === 'inventorySettings' && <InventorySettingsModal close={()=>setModal(null)} ownerId={activeOwner?.id} storeId={activeStore?.id} />}
+                     {modal === 'backup' && <BackupModal close={()=>setModal(null)} />}
                      
                      {modal === 'storePermissions' && (
                          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-2">
@@ -18727,6 +19106,7 @@ RINGKASAN KPI:
                             {view === 'settings' && <SettingsManager />}
                             {view === 'inventory' && <StockManager />}
                             {view === 'finance' && <FinanceManager />}
+                            {view === 'backup' && <BackupPage />}
                         </div>
                         {/* Bottom Navigation Mobile */}
                         <div className="bottom-nav">
@@ -18992,6 +19372,7 @@ RINGKASAN KPI:
                     <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center"></div>
                     <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative z-10">
                         <div className="p-8 text-center bg-blue-600">
+                            <img src="/logo-ifix.png" alt="iFix Enterprise" className="w-32 h-32 object-contain mx-auto mb-4 bg-white rounded-2xl p-3 shadow-lg" />
                             <h1 className="text-2xl font-black text-white tracking-tight">iFix Enterprise</h1>
                             <p className="text-blue-100 text-sm mt-1">Cloud Management Platform</p>
                         </div>
