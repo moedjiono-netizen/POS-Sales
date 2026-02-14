@@ -7591,26 +7591,35 @@ RINGKASAN KPI:
             const [showKelengkapan, setShowKelengkapan] = useState(false);
             const [partMode, setPartMode] = useState('stock');
             const [selectedCategory, setSelectedCategory] = useState('');
+            const [selectedSubCategory, setSelectedSubCategory] = useState('');
             const [selectedPart, setPart] = useState('');
+            const [searchPartTerm, setSearchPartTerm] = useState('');
+            const [showPartDropdown, setShowPartDropdown] = useState(false);
             const [manualPart, setManualPart] = useState({name:'', price:''});
             const [saving, setSaving] = useState(false);
             const [customCategories, setCustomCategories] = useState([]);
+            const [subCategories, setSubCategories] = useState({});
             const [cashAccount, setCashAccount] = useState('Kas Tunai');
             
-            // Load custom categories from Firestore real-time
+            // Load custom categories and subCategories from Firestore real-time
             useEffect(() => {
                 if (!initial.ownerId) return;
                 let q = query(collection(db, APP_COLLECTION_PREFIX, 'public', 'store_configs'), 
                     where('ownerId', '==', initial.ownerId));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     const allCats = new Set();
+                    const allSubCats = {};
                     snapshot.docs.forEach(doc => {
                         const data = doc.data();
                         if (data.customCategories && Array.isArray(data.customCategories)) {
                             data.customCategories.forEach(cat => allCats.add(cat));
                         }
+                        if (data.subCategories && typeof data.subCategories === 'object') {
+                            Object.assign(allSubCats, data.subCategories);
+                        }
                     });
                     setCustomCategories(Array.from(allCats));
+                    setSubCategories(allSubCats);
                 });
                 if (window.firestoreListeners) window.firestoreListeners.add(unsubscribe);
                 return () => {
@@ -7624,10 +7633,26 @@ RINGKASAN KPI:
             const defaultCategories = ['Sparepart', 'Aksesori', 'Tools', 'Lainnya'];
             const inventoryCategories = [...new Set([...invCategories, ...defaultCategories, ...customCategories])];
             
-            // Filter inventory by selected category
-            const categorizedInventory = selectedCategory
-                ? inventory.filter(i => i.category === selectedCategory)
-                : inventory;
+            // Get sub categories for selected category
+            const availableSubCategories = selectedCategory && subCategories[selectedCategory] 
+                ? subCategories[selectedCategory] 
+                : [];
+            
+            // Filter inventory by selected category, sub category, and search term
+            let filteredInventory = inventory;
+            if (selectedCategory) {
+                filteredInventory = filteredInventory.filter(i => i.category === selectedCategory);
+            }
+            if (selectedSubCategory) {
+                filteredInventory = filteredInventory.filter(i => i.subCategory === selectedSubCategory);
+            }
+            if (searchPartTerm) {
+                const term = searchPartTerm.toLowerCase();
+                filteredInventory = filteredInventory.filter(i => 
+                    i.name?.toLowerCase().includes(term) || 
+                    i.sku?.toLowerCase().includes(term)
+                );
+            }
             // Master + Owner Kelengkapan Items (Dynamic)
             const [kelengkapanItems, setKelengkapanItems] = useState([]);
             const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
@@ -7675,6 +7700,8 @@ RINGKASAN KPI:
                     if (item) {
                         setForm(p => ({ ...p, usedParts: [...(p.usedParts||[]), { ...item, qty: 1, isManual: false }] }));
                         setPart('');
+                        setSearchPartTerm('');
+                        setShowPartDropdown(false);
                     }
                 } else {
                     if(manualPart.name && manualPart.price) {
@@ -7686,6 +7713,17 @@ RINGKASAN KPI:
                     }
                 }
             };
+            
+            // Close dropdown when clicking outside
+            useEffect(() => {
+                const handleClickOutside = (e) => {
+                    if (showPartDropdown && !e.target.closest('.relative')) {
+                        setShowPartDropdown(false);
+                    }
+                };
+                document.addEventListener('mousedown', handleClickOutside);
+                return () => document.removeEventListener('mousedown', handleClickOutside);
+            }, [showPartDropdown]);
             
             const handleSave = async () => {
                 setSaving(true);
@@ -8048,13 +8086,16 @@ RINGKASAN KPI:
                                                 </>
                                             ) : (
                                                 <>
+                                                    {/* Category Selector */}
                                                     {inventoryCategories.length > 0 && (
                                                         <select 
                                                             className="w-28 border border-blue-300 rounded-lg p-2 text-xs bg-white focus:outline-blue-500 font-bold" 
                                                             value={selectedCategory} 
                                                             onChange={e => {
                                                                 setSelectedCategory(e.target.value);
+                                                                setSelectedSubCategory('');
                                                                 setPart('');
+                                                                setSearchPartTerm('');
                                                             }}
                                                         >
                                                             <option value="">📁 Kategori</option>
@@ -8063,13 +8104,70 @@ RINGKASAN KPI:
                                                             ))}
                                                         </select>
                                                     )}
-                                                    <select className="flex-1 border rounded-lg p-2 text-xs bg-white focus:outline-blue-500" value={selectedPart} onChange={e => setPart(e.target.value)}>
-                                                        <option value="">-- Pilih Barang --</option>
-                                                        {categorizedInventory.map(i => <option key={i.id} value={i.id}>{i.name} - {formatCurrency(i.sellPrice)}</option>)}
-                                                    </select>
+                                                    
+                                                    {/* Sub Category Selector */}
+                                                    {availableSubCategories.length > 0 && (
+                                                        <select 
+                                                            className="w-28 border border-cyan-300 rounded-lg p-2 text-xs bg-white focus:outline-cyan-500 font-bold" 
+                                                            value={selectedSubCategory} 
+                                                            onChange={e => {
+                                                                setSelectedSubCategory(e.target.value);
+                                                                setPart('');
+                                                                setSearchPartTerm('');
+                                                            }}
+                                                        >
+                                                            <option value="">📂 Sub</option>
+                                                            {availableSubCategories.map(subCat => (
+                                                                <option key={subCat} value={subCat}>{subCat}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                    
+                                                    {/* Searchable Item Selector */}
+                                                    <div className="flex-1 relative">
+                                                        <input 
+                                                            type="text"
+                                                            className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white focus:outline-blue-500 focus:border-blue-500"
+                                                            placeholder="🔍 Ketik nama barang..."
+                                                            value={searchPartTerm}
+                                                            onChange={e => {
+                                                                setSearchPartTerm(e.target.value);
+                                                                setShowPartDropdown(true);
+                                                            }}
+                                                            onFocus={() => setShowPartDropdown(true)}
+                                                        />
+                                                        
+                                                        {/* Dropdown Results */}
+                                                        {showPartDropdown && searchPartTerm && filteredInventory.length > 0 && (
+                                                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                                {filteredInventory.slice(0, 10).map(item => (
+                                                                    <div 
+                                                                        key={item.id}
+                                                                        className="p-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0"
+                                                                        onClick={() => {
+                                                                            setPart(item.id);
+                                                                            setSearchPartTerm(item.name);
+                                                                            setShowPartDropdown(false);
+                                                                        }}
+                                                                    >
+                                                                        <div className="flex justify-between items-center">
+                                                                            <span className="text-xs font-medium text-slate-700">{item.name}</span>
+                                                                            <span className="text-xs font-bold text-blue-600">{formatCurrency(item.sellPrice)}</span>
+                                                                        </div>
+                                                                        <div className="flex gap-2 mt-0.5">
+                                                                            {item.category && <span className="text-[10px] text-slate-500">📁 {item.category}</span>}
+                                                                            {item.subCategory && <span className="text-[10px] text-cyan-600">📂 {item.subCategory}</span>}
+                                                                            <span className="text-[10px] text-slate-400">Stok: {item.stock || 0}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
                                                     {selectedPart && (
                                                         <div className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold border border-blue-200 whitespace-nowrap flex items-center">
-                                                            {formatCurrency(categorizedInventory.find(i => i.id === selectedPart)?.sellPrice || 0)}
+                                                            {formatCurrency(inventory.find(i => i.id === selectedPart)?.sellPrice || 0)}
                                                         </div>
                                                     )}
                                                 </>
