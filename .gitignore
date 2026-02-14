@@ -1,0 +1,13 @@
+# Netlify
+netlify-deploy*.zip
+netlify-final.zip
+.netlify/
+
+# Screenshots
+*.jpg
+*.jpeg
+*.png
+!logo-ifix.png
+
+# Temp
+/tmp/
