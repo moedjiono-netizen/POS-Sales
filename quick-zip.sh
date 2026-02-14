@@ -21,11 +21,13 @@ zip -r "$ZIP_NAME" . \
     -x "*node_modules/*" \
     -x "*.zip" \
     -x "Screenshot_*.jpg" \
-    -x "*.png" \
+    -x "Screenshot_*.png" \
     -x "DEPLOY-FIX.md" \
     -x "NETLIFY-DEPLOY.md" \
+    -x "AUTO-ZIP-README.md" \
     -x "*auto-zip.sh" \
     -x "*quick-zip.sh" \
+    -x "*test-auto-zip.sh" \
     -x "*.swp" \
     -x "*~" \
     -q

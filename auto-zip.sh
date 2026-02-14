@@ -28,10 +28,12 @@ zip -r "$NEW_ZIP" . \
     -x "*.git*" \
     -x "*node_modules/*" \
     -x "*.zip" \
-    -x "*.jpg" \
-    -x "*.png" \
+    -x "Screenshot_*.jpg" \
+    -x "Screenshot_*.png" \
     -x "*.md" \
     -x "*auto-zip.sh" \
+    -x "*quick-zip.sh" \
+    -x "*test-auto-zip.sh" \
     -x "*.swp" \
     -x "*~" \
     -q
