@@ -1910,25 +1910,37 @@ const SessionProvider = ({ children }) => {
             const checkPermission = (featureKey) => {
                 if (userProfile?.role === 'superadmin') return true;
                 
+                const userRole = userProfile?.role || 'kasir';
+                
                 // Essential features that should work by default
                 const essentialFeatures = ['feature_delete', 'feature_print', 'feature_share'];
                 
+                // NEW: Per-Role Access Control
+                // Check if accessRights has role-based structure (nested object)
+                let roleAccess = null;
+                if (ownerAccess) {
+                    // Check if this is new per-role structure
+                    if (ownerAccess[userRole] && typeof ownerAccess[userRole] === 'object') {
+                        roleAccess = ownerAccess[userRole];
+                    } else if (ownerAccess[featureKey] !== undefined) {
+                        // Backward compatibility: old flat structure (global for all users)
+                        roleAccess = ownerAccess;
+                    }
+                }
+                
                 // For essential features, only block if explicitly disabled
                 if (essentialFeatures.includes(featureKey)) {
-                    // Owner level restriction
-                    if (ownerAccess && ownerAccess[featureKey] === false) return false;
+                    // Role-based restriction
+                    if (roleAccess && roleAccess[featureKey] === false) return false;
                     // Store level restriction  
                     if (storeConfig && storeConfig[featureKey] === false) return false;
                     // Default to enabled for essential features
                     return true;
                 }
                 
-                // Priority: Owner Access (Platform level) -> Store Config (Store level)
-                if (ownerAccess && ownerAccess[featureKey] === false) return false;
-                if (userProfile?.role === 'owner') return true;
-                if (storeConfig && storeConfig[featureKey] === false) return false;
-                return true;
-            };
+                // Priority: Role Access (tenant level) -> Store Config (store level)
+                if (roleAccess && roleAccess[featureKey] === false) return false;
+                if (userProfile?.role === 'owner') return true; // Owner always has access unless explicitly locked
 
             // Subscription status calculation
             const subscriptionStatus = useMemo(() => {
@@ -3432,6 +3444,7 @@ const SuperAdminDashboard = () => {
              const [modal, setModal] = useState(null); 
              const [selectedOwner, setSelectedOwner] = useState(null);
              const [selectedOwnerUser, setSelectedOwnerUser] = useState(null);
+             const [selectedRole, setSelectedRole] = useState('owner'); // NEW: Role selector for access rights
              const [loading, setLoading] = useState(false);
              
              // Load subscription config from Firestore
