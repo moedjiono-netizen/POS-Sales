@@ -24,11 +24,14 @@
             name: "iFix Pro - Phone Repair POS",
             short_name: "iFix Pro",
             description: "Sistem POS untuk servis HP dengan fitur multi-branch, inventory, HR & Payroll",
-            start_url: window.location.pathname,
+            start_url: "/",
+            scope: "/",
             display: "standalone",
+            display_override: ["window-controls-overlay", "standalone"],
             background_color: "#0f172a",
             theme_color: "#2563eb",
             orientation: "any",
+            prefer_related_applications: false,
             icons: [{
                 src: "/logo-ifix.png",
                 sizes: "192x192",
@@ -37,7 +40,8 @@
             }, {
                 src: "/logo-ifix.png",
                 sizes: "512x512",
-                type: "image/png"
+                type: "image/png",
+                purpose: "any"
             }]
         };
         const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
@@ -797,13 +801,13 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
-                    const CACHE_NAME = 'ifix-pro-v2';
+                    const CACHE_NAME = 'ifix-pro-v3';
                     const urlsToCache = [
                         '/logo-ifix.png'
                     ];
                     
                     self.addEventListener('install', e => {
-                        console.log('SW: Installing v2');
+                        console.log('SW: Installing v3');
                         e.waitUntil(
                             caches.open(CACHE_NAME).then(cache => {
                                 console.log('SW: Caching logo');
@@ -813,7 +817,7 @@
                     });
                     
                     self.addEventListener('activate', e => {
-                        console.log('SW: Activating v2');
+                        console.log('SW: Activating v3');
                         e.waitUntil(
                             caches.keys().then(cacheNames => {
                                 return Promise.all(
@@ -829,8 +833,27 @@
                     });
                     
                     self.addEventListener('fetch', e => {
-                        // Cache-first strategy for logo, network-first for others
-                        if (e.request.url.includes('/logo-ifix.png')) {
+                        const url = new URL(e.request.url);
+                        
+                        // NEVER cache HTML - always fetch from network
+                        if (e.request.method === 'GET' && 
+                            (e.request.destination === 'document' || 
+                             url.pathname.endsWith('.html') || 
+                             url.pathname === '/' || 
+                             url.pathname === '/index.html')) {
+                            e.respondWith(
+                                fetch(e.request).catch(() => {
+                                    return new Response(
+                                        '<h1>Offline</h1><p>Anda sedang offline. Silakan coba lagi saat terhubung ke internet.</p>',
+                                        { headers: { 'Content-Type': 'text/html' } }
+                                    );
+                                })
+                            );
+                            return;
+                        }
+                        
+                        // Cache-first strategy for logo only
+                        if (url.pathname.includes('/logo-ifix.png')) {
                             e.respondWith(
                                 caches.match(e.request).then(response => {
                                     return response || fetch(e.request).then(fetchResponse => {
@@ -841,11 +864,13 @@
                                     });
                                 })
                             );
-                        } else {
-                            e.respondWith(
-                                fetch(e.request).catch(() => caches.match(e.request))
-                            );
+                            return;
                         }
+                        
+                        // Network-first for everything else (Firebase, API calls, etc.)
+                        e.respondWith(
+                            fetch(e.request).catch(() => caches.match(e.request))
+                        );
                     });
                 `;
                 const swBlob = new Blob([swCode], { type: 'application/javascript' });
@@ -853,6 +878,8 @@
                 
                 navigator.serviceWorker.register(swUrl).then(reg => {
                     console.log('PWA: Service Worker registered');
+                    // Force update pada reload untuk memastikan tidak ada cache lama
+                    reg.update();
                 }).catch(err => {
                     console.log('PWA: SW registration skipped (OK for development)');
                 });
@@ -19916,6 +19943,10 @@ RINGKASAN KPI:
             const [rememberMe, setRememberMe] = useState(false);
             const [error, setError] = useState('');
             const [loading, setLoading] = useState(false);
+            
+            // Detect PWA mode
+            const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                          window.navigator.standalone === true;
 
             const handleAuth = async (e) => {
                 e.preventDefault();
@@ -19931,6 +19962,7 @@ RINGKASAN KPI:
                     if (err.code === 'auth/user-not-found') msg = "Akun tidak ditemukan.";
                     if (err.code === 'auth/wrong-password') msg = "Password salah.";
                     if (err.code === 'auth/too-many-requests') msg = "Terlalu banyak percobaan. Coba lagi nanti.";
+                    if (err.code === 'auth/network-request-failed') msg = "Koneksi internet bermasalah. Periksa koneksi Anda.";
                     setError(msg);
                 } finally {
                     setLoading(false);
@@ -19982,6 +20014,18 @@ RINGKASAN KPI:
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Masuk Aplikasi'}
                                 </button>
                             </form>
+                            
+                            {/* PWA Mode Info */}
+                            {isPWA && (
+                                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-xs text-blue-700 font-bold mb-1 flex items-center gap-1">
+                                        <Smartphone className="w-3.5 h-3.5"/> Mode Aplikasi (PWA)
+                                    </p>
+                                    <p className="text-xs text-blue-600">
+                                        Jika tidak bisa login, <span className="font-bold">buka dari browser</span> untuk clear cache lama, lalu install ulang.
+                                    </p>
+                                </div>
+                            )}
                             
                             <div className="mt-6 pt-6 border-t border-slate-100 text-center">
                                 <p className="text-xs text-slate-400">Pastikan email Anda telah didaftarkan oleh Admin/Owner toko Anda.</p>
