@@ -8128,22 +8128,32 @@ RINGKASAN KPI:
                                                         <input 
                                                             type="text"
                                                             className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white focus:outline-blue-500 focus:border-blue-500"
-                                                            placeholder="🔍 Ketik nama barang..."
+                                                            placeholder="🔍 Ketik atau klik untuk pilih barang..."
                                                             value={searchPartTerm}
                                                             onChange={e => {
                                                                 setSearchPartTerm(e.target.value);
                                                                 setShowPartDropdown(true);
+                                                                setPart(''); // Reset selection saat mengetik
                                                             }}
                                                             onFocus={() => setShowPartDropdown(true)}
                                                         />
                                                         
-                                                        {/* Dropdown Results */}
-                                                        {showPartDropdown && searchPartTerm && filteredInventory.length > 0 && (
-                                                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                                                {filteredInventory.slice(0, 10).map(item => (
+                                                        {/* Dropdown Results - Show all filtered items or search results */}
+                                                        {showPartDropdown && filteredInventory.length > 0 && (
+                                                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                                                                {/* Show count info */}
+                                                                <div className="sticky top-0 bg-slate-50 px-3 py-1.5 border-b border-slate-200 text-[10px] text-slate-600 font-bold">
+                                                                    {searchPartTerm 
+                                                                        ? `${filteredInventory.length} hasil pencarian` 
+                                                                        : `${filteredInventory.length} barang tersedia`
+                                                                    }
+                                                                </div>
+                                                                
+                                                                {/* Items list */}
+                                                                {filteredInventory.slice(0, 50).map(item => (
                                                                     <div 
                                                                         key={item.id}
-                                                                        className="p-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0"
+                                                                        className="p-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
                                                                         onClick={() => {
                                                                             setPart(item.id);
                                                                             setSearchPartTerm(item.name);
@@ -8161,6 +8171,22 @@ RINGKASAN KPI:
                                                                         </div>
                                                                     </div>
                                                                 ))}
+                                                                
+                                                                {/* Show "type to search" hint if no search term and many items */}
+                                                                {!searchPartTerm && filteredInventory.length > 50 && (
+                                                                    <div className="p-3 text-center bg-blue-50 text-blue-600 text-[10px]">
+                                                                        💡 Menampilkan 50 dari {filteredInventory.length} barang. Ketik untuk mencari lebih spesifik.
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Empty state */}
+                                                        {showPartDropdown && filteredInventory.length === 0 && (
+                                                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg p-4 text-center">
+                                                                <div className="text-slate-400 text-xs">
+                                                                    {searchPartTerm ? '🔍 Tidak ada barang yang cocok' : '📦 Tidak ada barang di kategori ini'}
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
