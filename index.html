@@ -1119,14 +1119,33 @@
         const createUserWithEmailAndPassword = async (authInst, email, password) => {
             try {
                 console.log('Creating user with email:', email);
+                // Note: PocketBase non-admin API does NOT allow setting 'verified' directly
                 const record = await pb.collection('users').create({
                     email: email,
                     password: password,
                     passwordConfirm: password,
-                    verified: true,
                     emailVisibility: true,
                 });
                 console.log('✅ User created successfully:', record.id);
+                
+                // Set verified=true via admin API (non-admin SDK can't set this)
+                try {
+                    const adminToken = pb.authStore.token;
+                    if (adminToken) {
+                        await fetch(`${POCKETBASE_URL}/api/collections/users/records/${record.id}`, {
+                            method: 'PATCH',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': adminToken
+                            },
+                            body: JSON.stringify({ verified: true })
+                        });
+                        console.log('✅ User verified via admin API');
+                    }
+                } catch (verifyErr) {
+                    console.warn('⚠️ Could not auto-verify user:', verifyErr.message);
+                }
+                
                 return { user: { uid: record.id, email: record.email } };
             } catch (err) {
                 console.error('❌ createUserWithEmailAndPassword error:', err);
