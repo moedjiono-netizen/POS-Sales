@@ -506,7 +506,17 @@
         // 🔄 POCKETBASE COMPATIBILITY LAYER
         // Mimics Firebase API → PocketBase
         // ==========================================
-        const POCKETBASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8090' : 'http://202.10.40.89:8090';
+        // Auto-detect PocketBase URL: jika dihosting dari PocketBase sendiri (pb_public), gunakan origin yang sama
+        const POCKETBASE_URL = (() => {
+            const host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8090';
+            // Jika diakses dari VPS langsung (PocketBase serve frontend)
+            if (host === '202.10.40.89') return window.location.origin;
+            // Jika diakses dari domain custom yang mengarah ke VPS
+            if (host === 'server1.amproject.com') return window.location.origin;
+            // Fallback: VPS IP
+            return 'http://202.10.40.89:8090';
+        })();
         const pb = new PocketBase(POCKETBASE_URL);
         console.log('🔌 PocketBase SDK loaded, connecting to:', POCKETBASE_URL);
         
