@@ -2535,6 +2535,7 @@
             // Build constraints
             const constraints = [];
             if (ownerId) constraints.push(where('ownerId', '==', ownerId));
+            if (storeId) constraints.push(where('storeId', '==', storeId));
             constraints.push(...extraConstraints);
 
             // Build query parts
