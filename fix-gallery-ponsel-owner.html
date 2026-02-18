@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Gallery Ponsel Owner - iFix Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .status-box {
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-box.success {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+            color: #065f46;
+            display: block;
+        }
+
+        .status-box.error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+            color: #991b1b;
+            display: block;
+        }
+
+        .status-box.info {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            color: #1e40af;
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .info-box {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-box li {
+            padding: 5px 0;
+            color: #666;
+        }
+
+        .info-box li:before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .user-details {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .user-details h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .user-details p {
+            margin: 5px 0;
+            color: #666;
+        }
+
+        .user-details strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Fix Gallery Ponsel Owner</h1>
+            <p>Perbaiki akun owner@galerryponsel.com</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <h3>Masalah yang akan diperbaiki:</h3>
+                <ul>
+                    <li>Akun owner@galerryponsel.com tidak memiliki Role</li>
+                    <li>Akun ditolak saat login (Belum Aktif)</li>
+                    <li>Tidak bisa akses sistem</li>
+                </ul>
+            </div>
+
+            <div id="statusMessage" class="status-box"></div>
+
+            <div class="form-group">
+                <label for="pbUrl">PocketBase URL:</label>
+                <input type="text" id="pbUrl" value="https://amproject.my.id" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="adminEmail">Admin Email:</label>
+                <input type="email" id="adminEmail" placeholder="admin@example.com" value="admin@ifix.com">
+            </div>
+
+            <div class="form-group">
+                <label for="adminPassword">Admin Password:</label>
+                <input type="password" id="adminPassword" placeholder="Enter admin password" value="Agis1989">
+            </div>
+
+            <div class="form-group">
+                <label for="targetEmail">Target Email (Owner Gallery Ponsel):</label>
+                <input type="email" id="targetEmail" value="owner@galerryponsel.com" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="newRole">Role yang akan diberikan:</label>
+                <select id="newRole">
+                    <option value="owner">Owner (Full Access)</option>
+                    <option value="admin">Admin</option>
+                    <option value="kasir">Kasir</option>
+                    <option value="teknisi">Teknisi</option>
+                </select>
+            </div>
+
+            <button onclick="fixOwnerAccount()">🚀 Perbaiki Akun Sekarang</button>
+
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Memproses...</p>
+            </div>
+
+            <div id="userDetails" class="user-details" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pocketbase@0.21.5/dist/pocketbase.umd.js"></script>
+    <script>
+        let pb;
+
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = 'status-box ' + type;
+            statusDiv.innerHTML = '<strong>' + message + '</strong>';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 10000);
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').className = show ? 'loading active' : 'loading';
+        }
+
+        async function fixOwnerAccount() {
+            const pbUrl = document.getElementById('pbUrl').value.trim();
+            const adminEmail = document.getElementById('adminEmail').value.trim();
+            const adminPassword = document.getElementById('adminPassword').value.trim();
+            const targetEmail = document.getElementById('targetEmail').value.trim();
+            const newRole = document.getElementById('newRole').value;
+
+            if (!adminEmail || !adminPassword) {
+                showStatus('error', '❌ Mohon lengkapi admin email dan password!');
+                return;
+            }
+
+            showLoading(true);
+            showStatus('info', '🔄 Menghubungkan ke PocketBase...');
+
+            try {
+                pb = new PocketBase(pbUrl);
+                
+                // Step 1: Authenticate as admin
+                await pb.admins.authWithPassword(adminEmail, adminPassword);
+                showStatus('success', '✅ Berhasil login sebagai admin!');
+                
+                // Step 2: Find owner record
+                showStatus('info', '🔍 Mencari owner Gallery Ponsel...');
+                const owners = await pb.collection('owners').getFullList({
+                    filter: `email = "${targetEmail}"`
+                });
+
+                if (owners.length === 0) {
+                    showStatus('error', '❌ Owner dengan email ' + targetEmail + ' tidak ditemukan!');
+                    showLoading(false);
+                    return;
+                }
+
+                const owner = owners[0];
+                console.log('Found owner:', owner);
+
+                // Step 3: Find or create user in owner's tenant collection
+                showStatus('info', '🔍 Mencari user di tenant collection...');
+                const tenantCollection = `t_${owner.id}_users`;
+                
+                let userRecord;
+                try {
+                    const users = await pb.collection(tenantCollection).getFullList({
+                        filter: `email = "${targetEmail}"`
+                    });
+
+                    if (users.length > 0) {
+                        userRecord = users[0];
+                        showStatus('info', '✅ User ditemukan! Updating role...');
+                        
+                        // Update existing user
+                        userRecord = await pb.collection(tenantCollection).update(userRecord.id, {
+                            role: newRole,
+                            name: owner.name || 'Gallery Ponsel Owner',
+                            verified: true
+                        });
+                        
+                        showStatus('success', '✅ User role berhasil diupdate menjadi: ' + newRole);
+                    } else {
+                        showStatus('info', '📝 Membuat user baru...');
+                        
+                        // Create new user
+                        userRecord = await pb.collection(tenantCollection).create({
+                            email: targetEmail,
+                            emailVisibility: true,
+                            verified: true,
+                            name: owner.name || 'Gallery Ponsel Owner',
+                            role: newRole,
+                            ownerId: owner.id,
+                            password: 'GalleryPonsel2026',
+                            passwordConfirm: 'GalleryPonsel2026'
+                        });
+                        
+                        showStatus('success', '✅ User baru berhasil dibuat dengan role: ' + newRole);
+                    }
+                } catch (error) {
+                    console.error('Error with tenant collection:', error);
+                    showStatus('error', '❌ Error: ' + error.message);
+                    showLoading(false);
+                    return;
+                }
+
+                // Step 4: Also ensure user exists in global 'users' collection
+                showStatus('info', '🔍 Checking global users collection...');
+                try {
+                    const globalUsers = await pb.collection('users').getFullList({
+                        filter: `email = "${targetEmail}"`
+                    });
+
+                    if (globalUsers.length > 0) {
+                        // Update global user
+                        await pb.collection('users').update(globalUsers[0].id, {
+                            role: newRole,
+                            verified: true,
+                            ownerId: owner.id
+                        });
+                        showStatus('info', '✅ Global user record updated');
+                    } else {
+                        // Create in global users
+                        await pb.collection('users').create({
+                            email: targetEmail,
+                            emailVisibility: true,
+                            verified: true,
+                            name: owner.name || 'Gallery Ponsel Owner',
+                            role: newRole,
+                            ownerId: owner.id,
+                            password: 'GalleryPonsel2026',
+                            passwordConfirm: 'GalleryPonsel2026'
+                        });
+                        showStatus('info', '✅ Global user record created');
+                    }
+                } catch (globalError) {
+                    console.warn('Global users error (might be expected):', globalError);
+                }
+
+                // Display user details
+                const detailsDiv = document.getElementById('userDetails');
+                detailsDiv.style.display = 'block';
+                detailsDiv.innerHTML = `
+                    <h4>✅ Akun Berhasil Diperbaiki!</h4>
+                    <p><strong>Email:</strong> ${targetEmail}</p>
+                    <p><strong>Role:</strong> ${newRole}</p>
+                    <p><strong>Owner:</strong> ${owner.name}</p>
+                    <p><strong>Store:</strong> ${owner.storeName || 'N/A'}</p>
+                    <p><strong>Status:</strong> <span style="color: #10b981;">✅ AKTIF</span></p>
+                    <p style="margin-top: 15px; color: #666; font-size: 14px;">
+                        <strong>Password:</strong> GalleryPonsel2026<br>
+                        <em>Silakan login dengan email dan password baru.</em>
+                    </p>
+                `;
+
+                showStatus('success', '🎉 Akun owner@galerryponsel.com berhasil diperbaiki! Silakan refresh dan login kembali.');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('error', '❌ Error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+    </script>
+</body>
+</html>
