@@ -9649,11 +9649,18 @@ RINGKASAN KPI:
                 if (paid >= totalBiaya && totalBiaya > 0) paymentStatus = 'Lunas'; 
                 else if (paid > 0) paymentStatus = 'DP'; 
                 
-                // Ensure consistent field names in payload
+                // Ensure consistent field names in payload - force phone and unitType
                 const payload = { 
-                    ...data, 
-                    phone: data.phone || '', 
-                    unitType: data.unitType || '',
+                    ...data,
+                    // Override with consistent field names
+                    phone: data.phone || data.customerPhone || '', 
+                    unitType: data.unitType || data.deviceModel || data.device || data.deviceType || '',
+                    // Remove old field names to avoid confusion
+                    customerPhone: undefined,
+                    deviceModel: undefined,
+                    device: undefined,
+                    deviceType: undefined,
+                    // Standard fields
                     costEstimate: totalBiaya, 
                     ownerId: activeOwner.id, 
                     storeId: activeStore.id, 
@@ -10585,9 +10592,9 @@ RINGKASAN KPI:
             const uniqueCustomers = Array.from(new Map(
                 allServices.map(s => [s.customerName?.toLowerCase(), {
                     name: s.customerName,
-                    phone: s.phone,
+                    phone: s.phone || s.customerPhone || '',
                     address: s.address,
-                    phoneType: s.unitType
+                    phoneType: s.unitType || s.deviceModel || s.device || s.deviceType || ''
                 }])
             ).values())
             .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -10601,8 +10608,8 @@ RINGKASAN KPI:
             const loadFromHistory = (prevService) => {
                 setForm(prev => ({
                     ...prev,
-                    phone: prevService.phone,
-                    unitType: prevService.unitType,
+                    phone: prevService.phone || prevService.customerPhone || '',
+                    unitType: prevService.unitType || prevService.deviceModel || prevService.device || prevService.deviceType || '',
                     address: prevService.address,
                     imei: prevService.imei,
                     complaint: prevService.complaint,
@@ -11161,6 +11168,11 @@ RINGKASAN KPI:
 
                         <div className="p-5 border-t bg-gray-50 rounded-b-2xl flex gap-3 mt-6 -mx-6 -mb-6">
                             <button onClick={close} className="flex-1 py-3 border border-gray-300 bg-white rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Batal</button>
+                            {initial.id && (
+                                <button type="button" onClick={() => {
+                                    alert(`DEBUG INFO:\n\nID: ${initial.id}\nNama: ${form.customerName}\nNo HP: ${form.phone}\nType HP: ${form.unitType}\n\nData Asli Database:\nphone: ${initial.phone || 'undefined'}\ncustomerPhone: ${initial.customerPhone || 'undefined'}\nunitType: ${initial.unitType || 'undefined'}\ndeviceModel: ${initial.deviceModel || 'undefined'}\ndevice: ${initial.device || 'undefined'}\ndeviceType: ${initial.deviceType || 'undefined'}`);
+                                }} className="py-3 px-4 bg-purple-100 text-purple-700 rounded-xl font-bold hover:bg-purple-200 transition-colors text-sm">🔍 Debug</button>
+                            )}
                             <button onClick={handleSave} disabled={saving} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-colors">{saving ? 'Menyimpan...' : 'Simpan Data'}</button>
                         </div>
                     </div>
