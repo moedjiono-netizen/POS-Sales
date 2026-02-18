@@ -9652,14 +9652,9 @@ RINGKASAN KPI:
                 // Ensure consistent field names in payload - force phone and unitType
                 const payload = { 
                     ...data,
-                    // Override with consistent field names
+                    // Explicitly preserve phone and unitType with fallback
                     phone: data.phone || data.customerPhone || '', 
                     unitType: data.unitType || data.deviceModel || data.device || data.deviceType || '',
-                    // Remove old field names to avoid confusion
-                    customerPhone: undefined,
-                    deviceModel: undefined,
-                    device: undefined,
-                    deviceType: undefined,
                     // Standard fields
                     costEstimate: totalBiaya, 
                     ownerId: activeOwner.id, 
@@ -9668,6 +9663,12 @@ RINGKASAN KPI:
                     updatedAt: serverTimestamp(), 
                     token: data.token || generateToken() 
                 };
+                
+                // Clean up old field names AFTER we've copied their values
+                delete payload.customerPhone;
+                delete payload.deviceModel;
+                delete payload.device;
+                delete payload.deviceType;
                 
                 console.log('💾 saveService payload:', {
                     id: modal.id || 'NEW',
@@ -10657,10 +10658,33 @@ RINGKASAN KPI:
             }, [showPartDropdown]);
             
             const handleSave = async () => {
+                // VISUAL DEBUG untuk tablet
+                const debugInfo = `🚀 SEBELUM SIMPAN:\n\nNama: ${form.customerName}\nNo HP: ${form.phone || 'KOSONG!'}\nType HP: ${form.unitType || 'KOSONG!'}\n\nLanjut simpan?`;
+                
+                if (!confirm(debugInfo)) {
+                    return;
+                }
+                
+                console.log('🚀 handleSave START - Form data:', {
+                    customerName: form.customerName,
+                    phone: form.phone,
+                    unitType: form.unitType,
+                    hasPhone: !!form.phone,
+                    hasUnitType: !!form.unitType,
+                    fullForm: form
+                });
+                
                 setSaving(true);
                 try {
+                     const dataToSave = {...form, cashAccount};
+                     console.log('📤 Sending to save():', {
+                         phone: dataToSave.phone,
+                         unitType: dataToSave.unitType,
+                         customerName: dataToSave.customerName
+                     });
                      // Just call save - stock adjustment is handled in saveService function
-                     await save({...form, cashAccount});
+                     await save(dataToSave);
+                     alert('✅ Data tersimpan!\n\nNo HP: ' + (dataToSave.phone || 'kosong') + '\nType HP: ' + (dataToSave.unitType || 'kosong'));
                 } catch(e) {
                     alert("Error: " + e.message);
                 }
