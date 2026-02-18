@@ -10530,6 +10530,7 @@ RINGKASAN KPI:
             const [showPartDropdown, setShowPartDropdown] = useState(false);
             const [manualPart, setManualPart] = useState({name:'', price:''});
             const [saving, setSaving] = useState(false);
+            const [debugMode, setDebugMode] = useState(false);
             const [customCategories, setCustomCategories] = useState([]);
             const [subCategories, setSubCategories] = useState({});
             const [cashAccount, setCashAccount] = useState('Kas Tunai');
@@ -10658,13 +10659,6 @@ RINGKASAN KPI:
             }, [showPartDropdown]);
             
             const handleSave = async () => {
-                // VISUAL DEBUG untuk tablet
-                const debugInfo = `🚀 SEBELUM SIMPAN:\n\nNama: ${form.customerName}\nNo HP: ${form.phone || 'KOSONG!'}\nType HP: ${form.unitType || 'KOSONG!'}\n\nLanjut simpan?`;
-                
-                if (!confirm(debugInfo)) {
-                    return;
-                }
-                
                 console.log('🚀 handleSave START - Form data:', {
                     customerName: form.customerName,
                     phone: form.phone,
@@ -10684,9 +10678,10 @@ RINGKASAN KPI:
                      });
                      // Just call save - stock adjustment is handled in saveService function
                      await save(dataToSave);
-                     alert('✅ Data tersimpan!\n\nNo HP: ' + (dataToSave.phone || 'kosong') + '\nType HP: ' + (dataToSave.unitType || 'kosong'));
+                     alert('✅ BERHASIL SIMPAN!\n\nNo HP: ' + (dataToSave.phone || 'KOSONG') + '\nType HP: ' + (dataToSave.unitType || 'KOSONG'));
+                     close();
                 } catch(e) {
-                    alert("Error: " + e.message);
+                    alert("❌ ERROR: " + e.message);
                 }
                 setSaving(false);
             };
@@ -11189,6 +11184,38 @@ RINGKASAN KPI:
                             </div>
                         </div>
                         {/* COMPACT LAYOUT END */}
+
+                        {/* DEBUG INFO BOX - Always visible */}
+                        <div className="mt-4 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs font-bold text-yellow-800 uppercase">📊 Status Form</div>
+                                <button type="button" onClick={() => setDebugMode(!debugMode)} className="text-xs px-2 py-1 bg-yellow-200 rounded font-bold">
+                                    {debugMode ? 'Sembunyikan' : 'Detail'}
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                    <span className="text-yellow-700 font-medium">No HP:</span>
+                                    <span className={`ml-2 font-bold ${form.phone ? 'text-green-700' : 'text-red-700'}`}>
+                                        {form.phone || '❌ KOSONG'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-yellow-700 font-medium">Type HP:</span>
+                                    <span className={`ml-2 font-bold ${form.unitType ? 'text-green-700' : 'text-red-700'}`}>
+                                        {form.unitType || '❌ KOSONG'}
+                                    </span>
+                                </div>
+                            </div>
+                            {debugMode && (
+                                <div className="mt-2 pt-2 border-t border-yellow-300 text-[10px] text-yellow-700">
+                                    <div>ID: {initial.id || 'NEW'}</div>
+                                    <div>Nama: {form.customerName || '-'}</div>
+                                    <div>Status: {form.status}</div>
+                                    <div>Fee: {formatCurrency(form.serviceFee || 0)}</div>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="p-5 border-t bg-gray-50 rounded-b-2xl flex gap-3 mt-6 -mx-6 -mb-6">
                             <button onClick={close} className="flex-1 py-3 border border-gray-300 bg-white rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">Batal</button>
