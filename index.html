@@ -3208,6 +3208,91 @@ const SessionProvider = ({ children }) => {
                         };
                     }
 
+                    // Strategy 4: Auto-detect Owner — cek apakah email ada di 'owners' collection
+                    // Ini mencegah owner kehilangan akses meskipun record 'users' tidak punya role
+                    if (!profile || !profile.role) {
+                        try {
+                            console.log('🔍 Strategy 4: Checking owners collection for email:', email);
+                            const ownersRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'owners');
+                            const ownerQuery = query(ownersRef, where('email', '==', email));
+                            const ownerSnap = await getDocs(ownerQuery);
+                            if (!ownerSnap.empty) {
+                                const ownerData = { id: ownerSnap.docs[0].id, ...ownerSnap.docs[0].data() };
+                                console.log('✅ Strategy 4: Found owner record! Auto-assigning owner role:', ownerData.name);
+                                profile = {
+                                    id: profile?.id || ownerData.id,
+                                    email: email,
+                                    name: ownerData.name || email,
+                                    role: 'owner',
+                                    ownerId: ownerData.id,
+                                    storeId: ''
+                                };
+                                // Patch role ke PocketBase users record agar tidak kejadian lagi
+                                if (currentAuthModel && currentAuthModel.id) {
+                                    try {
+                                        await pb.collection('users').update(currentAuthModel.id, {
+                                            role: 'owner',
+                                            ownerId: ownerData.id,
+                                            verified: true
+                                        });
+                                        console.log('✅ Auto-patched PocketBase users record with owner role');
+                                    } catch(patchErr) {
+                                        console.warn('⚠️ Could not patch PocketBase record:', patchErr.message);
+                                    }
+                                }
+                                // Patch juga ke Firestore users
+                                try {
+                                    const usersRef2 = collection(db, APP_COLLECTION_PREFIX, 'public', 'users');
+                                    const uq = query(usersRef2, where('email', '==', email));
+                                    const uSnap = await getDocs(uq);
+                                    if (!uSnap.empty) {
+                                        await updateDoc(doc(db, APP_COLLECTION_PREFIX, 'public', 'users', uSnap.docs[0].id), {
+                                            role: 'owner',
+                                            ownerId: ownerData.id
+                                        });
+                                        console.log('✅ Auto-patched Firestore users record with owner role');
+                                    }
+                                } catch(fsErr) {
+                                    console.warn('⚠️ Could not patch Firestore record:', fsErr.message);
+                                }
+                            } else {
+                                // Strategy 4b: Cek di PocketBase owners collection
+                                try {
+                                    const pbOwners = await pb.collection('owners').getFullList({
+                                        filter: `email = "${email}"`
+                                    });
+                                    if (pbOwners.length > 0) {
+                                        const pbOwner = pbOwners[0];
+                                        console.log('✅ Strategy 4b: Found owner in PocketBase:', pbOwner.name);
+                                        profile = {
+                                            id: profile?.id || pbOwner.id,
+                                            email: email,
+                                            name: pbOwner.name || email,
+                                            role: 'owner',
+                                            ownerId: pbOwner.id,
+                                            storeId: ''
+                                        };
+                                        // Patch ke PocketBase users
+                                        if (currentAuthModel && currentAuthModel.id) {
+                                            try {
+                                                await pb.collection('users').update(currentAuthModel.id, {
+                                                    role: 'owner',
+                                                    ownerId: pbOwner.id,
+                                                    verified: true
+                                                });
+                                                console.log('✅ Auto-patched PocketBase users record (4b)');
+                                            } catch(pErr) { console.warn(pErr.message); }
+                                        }
+                                    }
+                                } catch(pbErr) {
+                                    console.warn('⚠️ PocketBase owners check failed:', pbErr.message);
+                                }
+                            }
+                        } catch(ownerCheckErr) {
+                            console.warn('⚠️ Strategy 4 failed:', ownerCheckErr.message);
+                        }
+                    }
+
                     if (profile && profile.role && profile.role !== 'guest') {
                         setUserProfile(profile);
                         if (profile.role !== 'developer' && profile.ownerId) {
