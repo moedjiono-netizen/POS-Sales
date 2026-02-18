@@ -54,7 +54,7 @@
     <!-- 
     � POCKETBASE BACKEND AKTIF 🔌
     ========================================
-    ✅ Self-hosted PocketBase di VPS: http://202.10.40.89:8090
+    ✅ Self-hosted PocketBase di VPS: https://amproject.my.id
     ✅ Real-time subscriptions via SSE
     ✅ Firebase-compatible adapter layer
     ✅ Semua 28 collections di-mirror ke PocketBase
@@ -89,7 +89,7 @@
     - Tailwind CSS: Latest (via CDN - safe to update)
     
     BACKEND:
-    - PocketBase Server: 0.22.6 at http://202.10.40.89:8090
+    - PocketBase Server: 0.22.6 at https://amproject.my.id
     - Firebase: REMOVED (migrated Feb 16, 2026)
     
     Last Verified: February 16, 2026
@@ -330,7 +330,7 @@
             
             <button onclick="document.getElementById('error-display').style.display='none'" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%;">Tutup</button>
             <button onclick="location.reload()" style="background: #10b981; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;">Reload Halaman</button>
-            <button onclick="navigator.clipboard.writeText(document.getElementById('error-content').textContent + '\\n\\n' + document.getElementById('diagnostic-info').textContent).then(() => alert('✅ Error & diagnostic info berhasil disalin ke clipboard!'))" style="background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;">📋 Copy Error Info</button>
+            <button onclick="window.copyToClipboard(document.getElementById('error-content').textContent + '\\n\\n' + document.getElementById('diagnostic-info').textContent)" style="background: #6366f1; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;">📋 Copy Error Info</button>
         </div>
     </div>
     
@@ -413,6 +413,53 @@
             console.error('❌ Error:', title, message, error);
         };
         
+        // Copy to clipboard with fallback for HTTP (non-HTTPS) context
+        window.copyToClipboard = function(text) {
+            // HTTPS context: use modern Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text)
+                    .then(() => {
+                        alert('✅ Error & diagnostic info berhasil disalin ke clipboard!');
+                        return true;
+                    })
+                    .catch(err => {
+                        console.error('Clipboard API failed:', err);
+                        return fallbackCopyToClipboard(text);
+                    });
+            }
+            // HTTP context: use fallback method
+            return fallbackCopyToClipboard(text);
+        };
+        
+        // Fallback copy method for HTTP context (uses document.execCommand)
+        function fallbackCopyToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '0';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                if (successful) {
+                    alert('✅ Error & diagnostic info berhasil disalin ke clipboard!');
+                    return true;
+                } else {
+                    alert('❌ Gagal menyalin ke clipboard. Silakan copy manual.');
+                    return false;
+                }
+            } catch (err) {
+                document.body.removeChild(textArea);
+                console.error('Fallback copy failed:', err);
+                alert('❌ Browser tidak mendukung copy otomatis. Silakan copy manual.');
+                return false;
+            }
+        }
+        
         // Catch all unhandled errors
         window.addEventListener('error', function(event) {
             showError(
@@ -490,7 +537,8 @@
           ShieldAlert, Shield, Building, Database, HardDriveDownload, HardDriveUpload, Layers,
           Loader2, LogIn, UserPlus, RefreshCcw, SearchX, Truck, CheckCheck, Pencil,
           Hash, Edit3, Filter, MinusCircle, Crown, Minus, History, Tag,
-          Zap, BarChart3, Info, ShoppingCart, Banknote, Phone, Mail, RotateCcw, RotateCw, Package, AlertCircle, ExternalLink
+          Zap, BarChart3, Info, ShoppingCart, Banknote, Phone, Mail, RotateCcw, RotateCw, Package, AlertCircle, ExternalLink,
+          File, CheckCircle2
         } from 'lucide-react';
         import { 
           BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, 
@@ -511,11 +559,11 @@
             const host = window.location.hostname;
             if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8090';
             // Jika diakses dari VPS langsung (PocketBase serve frontend)
-            if (host === '202.10.40.89') return window.location.origin;
+            if (host === 'amproject.my.id') return window.location.origin;
             // Jika diakses dari domain custom yang mengarah ke VPS
             if (host === 'server1.amproject.com') return window.location.origin;
-            // Fallback: VPS IP
-            return 'http://202.10.40.89:8090';
+            // Fallback: Domain amproject.my.id
+            return 'https://amproject.my.id';
         })();
         const pb = new PocketBase(POCKETBASE_URL);
         console.log('🔌 PocketBase SDK loaded, connecting to:', POCKETBASE_URL);
@@ -636,12 +684,24 @@
         // ── Firebase-compatible functions ──────────
         const collection = (dbArg, ...segments) => {
             const name = segments[segments.length - 1];
-            return new PBCollectionRef(name);
+            // Automatically apply tenant prefix for tenant-specific collections (DISABLED)
+            const tenantAwareName = getTenantCollection(name);
+            return new PBCollectionRef(tenantAwareName);
+        };
+
+        // Generate a random 15-char ID (matches PocketBase default ID format)
+        const _generateId = () => {
+            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let id = '';
+            const arr = crypto.getRandomValues(new Uint8Array(15));
+            for (let i = 0; i < 15; i++) id += chars[arr[i] % chars.length];
+            return id;
         };
 
         const doc = (dbOrRef, ...segments) => {
             if (dbOrRef && dbOrRef._isPBCollectionRef) {
-                if (segments.length === 0) return new PBDocRef(dbOrRef.collectionName, null);
+                // doc(collectionRef) → auto-generate ID (like Firebase)
+                if (segments.length === 0) return new PBDocRef(dbOrRef.collectionName, _generateId());
                 return new PBDocRef(dbOrRef.collectionName, segments[0]);
             }
             // doc(db, prefix, 'public', 'collection', 'docId')
@@ -782,7 +842,10 @@
                     } else { throw e; }
                 }
             } else {
-                await pb.collection(docRef.collectionName).create(cleanData);
+                const record = await pb.collection(docRef.collectionName).create(cleanData);
+                // Update ref with the new ID so callers can reference it
+                docRef.id = record.id;
+                docRef.path = `${docRef.collectionName}/${record.id}`;
             }
         };
 
@@ -974,6 +1037,45 @@
         const sum = (field) => ({ _type: 'sum', _field: field });
 
         // ── Auth Layer ────────────────────────────
+        // 🔐 Admin credentials cache for tenant creation (set during developer admin login)
+        let _pbAdminCredentials = null;
+        let _pbAdminTokenCache = null;
+
+        // Helper: Get a valid admin token (cached or fresh)
+        const getAdminToken = async () => {
+            // Try cached token first (check if still valid)
+            if (_pbAdminTokenCache) {
+                try {
+                    const resp = await fetch(`${POCKETBASE_URL}/api/admins/auth-refresh`, {
+                        method: 'POST',
+                        headers: { 'Authorization': _pbAdminTokenCache }
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        _pbAdminTokenCache = data.token;
+                        return _pbAdminTokenCache;
+                    }
+                } catch (e) { /* token expired, get fresh one */ }
+            }
+            // Get fresh token using stored credentials
+            if (_pbAdminCredentials) {
+                try {
+                    const resp = await fetch(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ identity: _pbAdminCredentials.email, password: _pbAdminCredentials.password })
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        _pbAdminTokenCache = data.token;
+                        console.log('✅ Fresh admin token obtained');
+                        return _pbAdminTokenCache;
+                    }
+                } catch (e) { console.warn('⚠️ Failed to get admin token:', e.message); }
+            }
+            return null;
+        };
+
         let app = {};
         let db = {};
         let auth = {
@@ -1008,6 +1110,22 @@
                     authInst.currentUser = user;
                     authInst._listeners.forEach(cb => cb(user));
                 }
+                // 🔐 For developer: also try to get admin token in background for tenant creation
+                if (email.toLowerCase() === DEVELOPER_EMAIL.toLowerCase()) {
+                    try {
+                        const adminResp = await fetch(POCKETBASE_URL + '/api/admins/auth-with-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ identity: email, password: password })
+                        });
+                        if (adminResp.ok) {
+                            const adminData = await adminResp.json();
+                            _pbAdminCredentials = { email, password };
+                            _pbAdminTokenCache = adminData.token;
+                            console.log('✅ Admin token cached for tenant management');
+                        }
+                    } catch (e) { /* admin password may differ from user password */ }
+                }
                 return { user };
             } catch (err) {
                 // 🔐 DEVELOPER FALLBACK: Try PocketBase admin auth for developer email
@@ -1022,6 +1140,9 @@
                         if (adminResponse.ok) {
                             const adminData = await adminResponse.json();
                             console.log('✅ PocketBase admin auth success!');
+                            // 🔐 Cache admin credentials & token for tenant creation
+                            _pbAdminCredentials = { email: email, password: password };
+                            _pbAdminTokenCache = adminData.token;
                             // Save admin token to authStore - override email with developer email for profile matching
                             const adminModel = { ...adminData.admin, email: email };
                             pb.authStore.save(adminData.token, adminModel);
@@ -1119,43 +1240,111 @@
         const createUserWithEmailAndPassword = async (authInst, email, password) => {
             try {
                 console.log('Creating user with email:', email);
-                // Note: PocketBase non-admin API does NOT allow setting 'verified' directly
+                
+                // Strategy: Use admin API to create user with verified=true directly
+                const adminToken = await getAdminToken();
+                
+                if (adminToken) {
+                    // 🔐 Admin API: create user with verified=true in one step
+                    console.log('📡 Creating user via Admin API (verified=true)...');
+                    const resp = await fetch(`${POCKETBASE_URL}/api/collections/users/records`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': adminToken
+                        },
+                        body: JSON.stringify({
+                            email: email,
+                            password: password,
+                            passwordConfirm: password,
+                            emailVisibility: true,
+                            verified: true
+                        })
+                    });
+                    
+                    if (resp.ok) {
+                        const record = await resp.json();
+                        console.log('✅ User created with verified=true:', record.id);
+                        return { user: { uid: record.id, email: record.email } };
+                    }
+                    
+                    // Handle API errors
+                    const errData = await resp.json().catch(() => ({}));
+                    console.error('❌ Admin API create failed:', resp.status, errData);
+                    
+                    // Check for duplicate email
+                    const errStr = JSON.stringify(errData).toLowerCase();
+                    if (resp.status === 400 && (errStr.includes('already') || errStr.includes('unique'))) {
+                        const e = new Error('Email ini sudah terdaftar.');
+                        e.code = 'auth/email-already-in-use';
+                        throw e;
+                    }
+                    // Check for password validation
+                    if (resp.status === 400 && errStr.includes('password')) {
+                        const e = new Error('Password harus minimal 8 karakter.');
+                        e.code = 'auth/weak-password';
+                        throw e;
+                    }
+                    // Other admin API error - throw
+                    const e = new Error(errData.message || 'Gagal membuat user via Admin API');
+                    e.code = 'auth/unknown';
+                    throw e;
+                }
+                
+                // Fallback: No admin token available - create via SDK (verified=false)
+                console.warn('⚠️ No admin token - creating user without verified flag');
                 const record = await pb.collection('users').create({
                     email: email,
                     password: password,
                     passwordConfirm: password,
                     emailVisibility: true,
                 });
-                console.log('✅ User created successfully:', record.id);
+                console.log('✅ User created (verified=false):', record.id);
                 
-                // Set verified=true via admin API (non-admin SDK can't set this)
+                // 🔧 FIX: Try to auto-verify using developer admin credentials
                 try {
-                    const adminToken = pb.authStore.token;
-                    if (adminToken) {
-                        await fetch(`${POCKETBASE_URL}/api/collections/users/records/${record.id}`, {
-                            method: 'PATCH',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Authorization': adminToken
-                            },
-                            body: JSON.stringify({ verified: true })
+                    if (email.toLowerCase() !== DEVELOPER_EMAIL.toLowerCase()) {
+                        console.log('🔧 Attempting to auto-verify user...');
+                        // Try admin auth with developer credentials to verify user
+                        const adminResp = await fetch(POCKETBASE_URL + '/api/admins/auth-with-password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                identity: 'admin@admin.com', 
+                                password: 'Bismillah@2024' 
+                            })
                         });
-                        console.log('✅ User verified via admin API');
+                        if (adminResp.ok) {
+                            const adminData = await adminResp.json();
+                            // Update user to verified
+                            const verifyResp = await fetch(`${POCKETBASE_URL}/api/collections/users/records/${record.id}`, {
+                                method: 'PATCH',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': adminData.token
+                                },
+                                body: JSON.stringify({ verified: true })
+                            });
+                            if (verifyResp.ok) {
+                                console.log('✅ User auto-verified successfully!');
+                            } else {
+                                console.warn('⚠️ Auto-verify failed, user needs manual verification');
+                            }
+                        }
                     }
                 } catch (verifyErr) {
-                    console.warn('⚠️ Could not auto-verify user:', verifyErr.message);
+                    console.warn('⚠️ Auto-verify failed:', verifyErr.message);
+                    console.warn('💡 User perlu di-verify manual via login-troubleshoot.html');
                 }
                 
                 return { user: { uid: record.id, email: record.email } };
-            } catch (err) {
-                console.error('❌ createUserWithEmailAndPassword error:', err);
-                console.error('Error details:', {
-                    status: err.status,
-                    message: err.message,
-                    data: err.data
-                });
                 
-                // Check if it's actually an email-already-in-use error
+            } catch (err) {
+                // Re-throw if already has error code
+                if (err.code) throw err;
+                
+                console.error('❌ createUserWithEmailAndPassword error:', err);
+                
                 const msg = (err.message || '').toLowerCase();
                 const dataStr = JSON.stringify(err.data || {}).toLowerCase();
                 
@@ -1167,7 +1356,6 @@
                     throw e;
                 }
                 
-                // Check for password validation errors
                 if (err.status === 400 && (msg.includes('password') || dataStr.includes('password'))) {
                     const e = new Error('Password harus minimal 8 karakter.');
                     e.code = 'auth/weak-password';
@@ -1175,7 +1363,6 @@
                     throw e;
                 }
                 
-                // Other errors
                 const e = new Error(err.message || 'Gagal membuat user: ' + JSON.stringify(err.data));
                 e.code = 'auth/unknown';
                 e.originalError = err;
@@ -1599,7 +1786,59 @@
         // Constants
         const DEVELOPER_EMAIL = "agis.cpcd@gmail.com";
         const APP_COLLECTION_PREFIX = "ifix_enterprise_data"; 
+
+        /**
+         * 🏢 TENANT-SPECIFIC COLLECTIONS (DISABLED - UNDER DEVELOPMENT)
+         * Generate collection name with tenant prefix for data isolation
+         * Format: tenant_{ownerId}_{collectionName}
+         * 
+         * CATATAN: Feature ini di-disable karena memerlukan migration data.
+         * Saat ini semua tenant menggunakan shared collections dengan filter ownerId.
+         */
+        const SYSTEM_COLLECTIONS = ['users', 'owners', 'plan_configs', 'stores', 'store_configs'];
         
+        // Global tenant context - not used yet
+        let _currentOwnerId = null;
+        
+        const getTenantCollection = (collectionName, ownerId) => {
+            // 🔴 DISABLED: Return collection name without tenant prefix
+            // Semua tenant menggunakan shared collections dengan filter ownerId
+            return collectionName;
+            
+            /* FUTURE: Enable tenant-specific collections after migration
+            // System-wide collections don't use tenant prefix
+            if (SYSTEM_COLLECTIONS.includes(collectionName)) {
+                return collectionName;
+            }
+            // Tenant-specific collections: tenant_{ownerId}_{collectionName}
+            const ownerIdToUse = ownerId || _currentOwnerId;
+            if (!ownerIdToUse) {
+                console.warn(`⚠️ getTenantCollection called without ownerId for ${collectionName}`);
+                return collectionName; // fallback to collection without prefix
+            }
+            return `tenant_${ownerIdToUse}_${collectionName}`;
+            */
+        };
+
+        // Update tenant context (called when activeOwner changes)
+        const setTenantContext = (ownerId) => {
+            // 🔴 DISABLED: No-op untuk saat ini
+            _currentOwnerId = ownerId;
+        };
+
+        // PocketBase ID mapping for plan_configs (PB requires 15-char IDs)
+        const _PLAN_CONFIG_IDS = { 'basic': 'basicplan000001', 'pro': 'proplanconf0001' };
+        const _planDocId = (planName) => _PLAN_CONFIG_IDS[planName] || planName;
+
+        // Auto-populate plan IDs from PocketBase at startup
+        (async () => {
+            try {
+                const result = await pb.collection('plan_configs').getFullList();
+                result.forEach(r => { if (r.plan) _PLAN_CONFIG_IDS[r.plan] = r.id; });
+                console.log('✅ Plan config IDs loaded:', _PLAN_CONFIG_IDS);
+            } catch(e) { console.warn('⚠️ Could not load plan config IDs:', e.message); }
+        })();
+
         // ==========================================
         // 🛠️ UTILS
         // ==========================================
@@ -2242,21 +2481,17 @@
          * 'paginated'= getDocs + startAfter (transaction history)
          */
         const COLLECTION_DATA_MODE = {
-            // --- Realtime: data yang berubah aktif & perlu langsung terlihat ---
-            services:       'realtime',   // active orders & running services
-            cash_accounts:  'realtime',   // active account balances
-            owners:         'realtime',   // admin dashboard - perlu auto-refresh
-
-            // --- Fetch: referensi yang jarang berubah ---
-            inventory:      'fetch',
-            customers:      'fetch',
-            sales:          'fetch',
-            users:          'fetch',
-            suppliers:      'fetch',
-            brands:         'fetch',
-
-            // --- Paginated: riwayat besar, perlu pagination ---
-            transactions:   'paginated',
+            // --- Realtime: semua collection realtime seperti Firebase ---
+            services:       'realtime',
+            cash_accounts:  'realtime',
+            owners:         'realtime',
+            inventory:      'realtime',
+            customers:      'realtime',
+            sales:          'realtime',
+            users:          'realtime',
+            suppliers:      'realtime',
+            brands:         'realtime',
+            transactions:   'realtime',
         };
 
         /**
@@ -2341,9 +2576,16 @@
 
             const applyStoreFilter = (items) => {
                 let filtered = items;
+                
+                // Filter by storeId if specified
                 if (storeId !== undefined && storeId !== null) {
                     filtered = filtered.filter(item => item.storeId === storeId);
                 }
+                
+                // Exclude deleted items (soft delete support)
+                filtered = filtered.filter(item => !item.deleted);
+                
+                // Sort by createdAt descending
                 filtered.sort((a, b) => {
                     const tA = a.createdAt?.seconds || a.date?.seconds || 0;
                     const tB = b.createdAt?.seconds || b.date?.seconds || 0;
@@ -2683,7 +2925,7 @@
                     ownerId,
                     storeId,
                     mode: effectiveMode,
-                    limitCount: 50, // backward compat: was 50
+                    limitCount: 1000, // PocketBase: no quota limit, load all
                     quotaContext,
                     callback: (result) => {
                         if (!isMounted) return;
@@ -2729,8 +2971,8 @@
                 
                 const colRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'inventory');
                 
-                // Limit 50 items untuk hemat Firestore reads
-                const limitCount = 50;
+                // PocketBase: no quota limit, load all items
+                const limitCount = 1000;
                 
                 // Query builder dengan filter server-side
                 let constraints = [where('ownerId', '==', ownerId)];
@@ -2824,7 +3066,7 @@ const useRealtimePlanSync = (activeOwner) => {
     if (!activeOwner?.plan || !activeOwner?.id) return;
 
     const unsub = onSnapshot(
-      doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', activeOwner.plan),
+      doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(activeOwner.plan)),
       async (snap) => {
         if (!snap.exists()) return;
         try {
@@ -2875,16 +3117,17 @@ const SessionProvider = ({ children }) => {
 
             // Load admin WA number and subscription pricing from config
             useEffect(() => {
+                const configRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'subscription_config');
                 const unsub = onSnapshot(
-                    doc(db, APP_COLLECTION_PREFIX, 'public', 'subscription_config', 'settings'),
-                    (snap) => { 
-                        if (snap.exists()) {
-                            const data = snap.data();
+                    query(configRef, limit(1)),
+                    (snapshot) => { 
+                        if (!snapshot.empty) {
+                            const data = snapshot.docs[0].data();
                             const wa = data.whatsapp || '';
                             console.log('📞 Admin WhatsApp loaded:', wa);
                             console.log('💎 Subscription pricing loaded:', data);
                             setAdminWhatsApp(wa);
-                            setSubConfig(data);
+                            setSubConfig({...data, _configId: snapshot.docs[0].id});
                         } else {
                             console.log('⚠️ Subscription config document not found');
                         }
@@ -2902,6 +3145,7 @@ const SessionProvider = ({ children }) => {
                     } else {
                         setUserProfile(null);
                         setActiveOwner(null);
+                        setTenantContext(null); // 🏢 Clear tenant context on logout
                         setActiveStore(null);
                         if(ownerUnsubRef.current) ownerUnsubRef.current();
                         if(storesUnsubRef.current) storesUnsubRef.current();
@@ -2993,6 +3237,7 @@ const SessionProvider = ({ children }) => {
                         if (docSnap.exists()) {
                             const ownerData = { id: docSnap.id, ...docSnap.data() };
                             setActiveOwner(ownerData);
+                            setTenantContext(ownerData.id); // 🏢 Set tenant context for collection prefix
                             setOwnerAccess(ownerData.accessRights || {});
                             
                             // Notifikasi jika ada perubahan akses
@@ -3231,7 +3476,7 @@ const PlanConfigModal = ({ close }) => {
 
   React.useEffect(() => {
     const unsub = onSnapshot(
-      doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', activePlan),
+      doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(activePlan)),
       (snap) => setConfig(snap.exists() ? snap.data() : {})
     );
     if (window.firestoreListeners) window.firestoreListeners.add(unsub);
@@ -3279,7 +3524,7 @@ const PlanConfigModal = ({ close }) => {
     setLoading(true);
     try {
       await setDoc(
-        doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', activePlan),
+        doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(activePlan)),
         config,
         { merge: true }
       );
@@ -4494,6 +4739,694 @@ const BackupModal = ({ close }) => {
     );
 };
 
+// RestoreBackupModal - Modal untuk restore backup JSON (untuk Owner & Admin)
+const RestoreBackupModal = ({ close }) => {
+    const { activeOwner, activeStore } = useContext(SessionContext);
+    const [file, setFile] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState({ current: 0, total: 0, collection: '' });
+    const [result, setResult] = useState(null);
+    const fileInputRef = useRef(null);
+
+    // Convert Firebase timestamp to ISO string
+    const convertFirebaseTimestamp = (ts) => {
+        if (!ts) return new Date().toISOString();
+        if (typeof ts === 'string') return ts;
+        if (ts.seconds) {
+            const date = new Date(ts.seconds * 1000 + (ts.nanoseconds || 0) / 1000000);
+            return date.toISOString();
+        }
+        return new Date().toISOString();
+    };
+
+    // Generate 15-char ID for PocketBase
+    const generatePBId = () => {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        let id = '';
+        for (let i = 0; i < 15; i++) {
+            id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return id;
+    };
+
+    const handleFileChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile && selectedFile.type === 'application/json') {
+            setFile(selectedFile);
+            setResult(null);
+        } else {
+            alert('❌ Pilih file JSON yang valid!');
+        }
+    };
+
+    const handleRestore = async () => {
+        if (!file) {
+            alert('❌ Pilih file backup terlebih dahulu!');
+            return;
+        }
+
+        if (!activeOwner?.id || !activeStore?.id) {
+            alert('❌ Data owner/toko tidak ditemukan!');
+            return;
+        }
+
+        const confirmRestore = confirm(
+            `⚠️ KONFIRMASI RESTORE\n\n` +
+            `File: ${file.name}\n` +
+            `Owner: ${activeOwner.name}\n` +
+            `Toko: ${activeStore.name}\n\n` +
+            `Data dari backup akan ditambahkan ke database.\n` +
+            `Data yang sudah ada TIDAK akan dihapus.\n\n` +
+            `Lanjutkan restore?`
+        );
+
+        if (!confirmRestore) return;
+
+        setLoading(true);
+        setResult(null);
+        const errors = [];
+        
+        try {
+            // Read file
+            const text = await file.text();
+            let backup = JSON.parse(text);
+
+            // ══════════════════════════════════════
+            // AUTO-DETECT BACKUP FORMAT
+            // Support 2 formats:
+            // 1. Firebase format: { customers: [...], inventory: [...], services: [...], ... }
+            // 2. Per-item format: [...] — array of records from single collection
+            // ══════════════════════════════════════
+            if (Array.isArray(backup) && backup.length > 0) {
+                // Per-item format: detect collection type from first item structure
+                const sample = backup[0];
+                let collectionType = null;
+
+                // Detection logic based on unique field combinations
+                if (sample.items && sample.total && sample.paymentMethod !== undefined) {
+                    collectionType = 'sales';
+                } else if (sample.stock !== undefined && sample.buyPrice !== undefined && sample.sellPrice !== undefined) {
+                    collectionType = 'inventory';
+                } else if ((sample.deviceModel || sample.unitType) && (sample.problem || sample.complaint) && sample.serviceFee !== undefined) {
+                    collectionType = 'services';
+                } else if (sample.type && sample.amount !== undefined && sample.category) {
+                    collectionType = 'transactions';
+                } else if (sample.name && sample.phone !== undefined && !sample.stock && !sample.items) {
+                    collectionType = 'customers';
+                }
+
+                if (collectionType) {
+                    // Normalize to Firebase format
+                    backup = { [collectionType]: backup };
+                    console.log(`📦 Detected per-item backup: ${collectionType} (${backup[collectionType].length} items)`);
+                } else {
+                    alert('⚠️ Format backup tidak dikenali. Pastikan file JSON valid.');
+                    setLoading(false);
+                    return;
+                }
+            } else if (typeof backup !== 'object' || backup === null) {
+                alert('⚠️ Format backup tidak valid. File harus berisi object atau array.');
+                setLoading(false);
+                return;
+            }
+
+            const stats = {
+                customers: { success: 0, failed: 0, skipped: 0 },
+                inventory: { success: 0, failed: 0, skipped: 0 },
+                services: { success: 0, failed: 0, skipped: 0 },
+                transactions: { success: 0, failed: 0, skipped: 0 },
+                sales: { success: 0, failed: 0, skipped: 0 }
+            };
+
+            // Helper: ensure JSON fields are stringified for PocketBase
+            const jsonField = (val, fallback) => {
+                if (val === undefined || val === null) return typeof fallback === 'string' ? fallback : JSON.stringify(fallback);
+                if (typeof val === 'string') return val;
+                return JSON.stringify(val);
+            };
+
+            // ══════════════════════════════════════
+            // Import Customers (direct PocketBase API)
+            // Schema: name, phone, address, customerType, ownerId, storeId, createdAt
+            // ══════════════════════════════════════
+            if (backup.customers?.length > 0) {
+                // Fetch existing customers to check duplicates
+                const existingCustResp = await pb.collection(getTenantCollection('customers', activeOwner.id)).getList(1, 500, {
+                    filter: `ownerId="${activeOwner.id}"`,
+                    fields: 'name,phone'
+                });
+                const existingCustKeys = new Set(
+                    existingCustResp.items.map(c => 
+                        `${(c.name || '').toLowerCase()}_${(c.phone || '').replace(/\D/g, '')}`
+                    )
+                );
+
+                setProgress({ current: 0, total: backup.customers.length, collection: 'Customers' });
+                for (let i = 0; i < backup.customers.length; i++) {
+                    const customer = backup.customers[i];
+                    
+                    // Skip deleted customers
+                    if (customer.deleted) {
+                        stats.customers.skipped++;
+                        setProgress({ current: i + 1, total: backup.customers.length, collection: 'Customers' });
+                        continue;
+                    }
+
+                    // Check duplicate
+                    const customerPhone = customer.phone || customer.customerPhone || customer.phoneNumber || '';
+                    const dupKey = `${(customer.name || '').toLowerCase()}_${customerPhone.replace(/\D/g, '')}`;
+                    if (existingCustKeys.has(dupKey)) {
+                        stats.customers.skipped++;
+                        setProgress({ current: i + 1, total: backup.customers.length, collection: 'Customers' });
+                        continue; // Skip duplicate
+                    }
+
+                    try {
+                        const data = {
+                            id: generatePBId(),
+                            name: customer.name || '',
+                            phone: customer.phone || customer.customerPhone || customer.phoneNumber || '',
+                            address: customer.address || '',
+                            customerType: customer.customerType || customer.phoneType || 'regular',
+                            ownerId: activeOwner.id,
+                            storeId: activeStore.id,
+                            createdAt: convertFirebaseTimestamp(customer.createdAt)
+                        };
+
+                        await pb.collection(getTenantCollection('customers', activeOwner.id)).create(data);
+                        stats.customers.success++;
+                        existingCustKeys.add(dupKey); // Add to set
+                    } catch (error) {
+                        stats.customers.failed++;
+                        errors.push(`Customer "${customer.name}": ${error.message}`);
+                        console.error('Failed to import customer:', customer.name, error);
+                    }
+
+                    setProgress({ current: i + 1, total: backup.customers.length, collection: 'Customers' });
+                }
+            }
+
+            // ══════════════════════════════════════
+            // Import Inventory (direct PocketBase API) 
+            // Schema: name, category, subCategory, brand, supplier, stock, buyPrice, sellPrice, minStock, ownerId, storeId, createdAt
+            // ══════════════════════════════════════
+            if (backup.inventory?.length > 0) {
+                // 🔹 Fetch existing inventory to prevent duplicates
+                const existingInventory = await pb.collection(getTenantCollection('inventory', activeOwner.id)).getFullList({
+                    filter: `ownerId="${activeOwner.id}" && storeId="${activeStore.id}"`
+                });
+                const inventoryKeys = new Set(
+                    existingInventory.map(item => 
+                        `${(item.name || '').toLowerCase()}_${(item.brand || '').toLowerCase()}_${item.category}`
+                    )
+                );
+
+                setProgress({ current: 0, total: backup.inventory.length, collection: 'Inventory' });
+                for (let i = 0; i < backup.inventory.length; i++) {
+                    const item = backup.inventory[i];
+
+                    // 🔹 Check for duplicate
+                    const itemKey = `${(item.name || '').toLowerCase()}_${(item.brand || '').toLowerCase()}_${item.category}`;
+                    if (inventoryKeys.has(itemKey)) {
+                        stats.inventory.failed++;
+                        console.log(`⚠️ Skipping duplicate inventory: ${item.name} (${item.brand})`);
+                        continue;
+                    }
+
+                    try {
+                        const data = {
+                            id: generatePBId(),
+                            name: item.name || '',
+                            category: item.category || '',
+                            subCategory: item.subCategory || '',
+                            brand: item.brand || '',
+                            supplier: item.supplier || '',
+                            stock: Number(item.stock) || 0,
+                            buyPrice: Number(item.buyPrice) || 0,
+                            sellPrice: Number(item.sellPrice) || 0,
+                            minStock: Number(item.minStock) || 0,
+                            ownerId: activeOwner.id,
+                            storeId: activeStore.id,
+                            createdAt: convertFirebaseTimestamp(item.createdAt)
+                        };
+
+                        await pb.collection(getTenantCollection('inventory', activeOwner.id)).create(data);
+                        inventoryKeys.add(itemKey); // 🔹 Add to prevent within-batch duplicates
+                        stats.inventory.success++;
+                    } catch (error) {
+                        stats.inventory.failed++;
+                        errors.push(`Inventory "${item.name}": ${error.message}`);
+                        console.error('Failed to import inventory:', item.name, error);
+                    }
+
+                    if ((i + 1) % 10 === 0 || i === backup.inventory.length - 1) {
+                        setProgress({ current: i + 1, total: backup.inventory.length, collection: 'Inventory' });
+                    }
+                }
+            }
+
+            // ══════════════════════════════════════
+            // Import Services (direct PocketBase API)
+            // Schema: customerName, customerPhone, deviceBrand, deviceModel, deviceSN, problem, status,
+            //   paymentStatus, costEstimate, serviceFee, dp, usedParts(json), notes, token, cashAccount,
+            //   ownerId, storeId, createdAt, updatedAt, completedAt, kelengkapan(json), qcChecklist(json), warrantyDays
+            // ══════════════════════════════════════
+            if (backup.services?.length > 0) {
+                setProgress({ current: 0, total: backup.services.length, collection: 'Services' });
+                for (let i = 0; i < backup.services.length; i++) {
+                    const service = backup.services[i];
+
+                    try {
+                        const data = {
+                            id: generatePBId(),
+                            token: service.token || '',
+                            customerName: service.customerName || '',
+                            customerPhone: service.phone || service.customerPhone || '',
+                            deviceBrand: service.deviceBrand || '',
+                            deviceModel: service.unitType || service.deviceModel || '',
+                            deviceSN: service.imei || service.deviceSN || '',
+                            problem: service.complaint || service.problem || '',
+                            status: service.status || 'Antri',
+                            paymentStatus: service.paymentStatus || 'Belum Lunas',
+                            costEstimate: Number(service.costEstimate) || 0,
+                            serviceFee: Number(service.serviceFee) || 0,
+                            dp: Number(service.dp) || 0,
+                            warrantyDays: Number(service.warranty || service.warrantyDays) || 0,
+                            cashAccount: service.cashAccount || 'Kas Tunai',
+                            notes: service.notes || '',
+                            kelengkapan: jsonField(service.kelengkapan, {}),
+                            qcChecklist: jsonField(service.qcFunctional || service.qcChecklist, {}),
+                            usedParts: jsonField(service.usedParts, []),
+                            ownerId: activeOwner.id,
+                            storeId: activeStore.id,
+                            createdAt: convertFirebaseTimestamp(service.createdAt),
+                            updatedAt: convertFirebaseTimestamp(service.updatedAt || service.createdAt),
+                            completedAt: service.status === 'Selesai' ? convertFirebaseTimestamp(service.updatedAt || service.createdAt) : ''
+                        };
+
+                        await pb.collection(getTenantCollection('services', activeOwner.id)).create(data);
+                        stats.services.success++;
+                    } catch (error) {
+                        stats.services.failed++;
+                        errors.push(`Service "${service.customerName} - ${service.token}": ${error.message}`);
+                        console.error('Failed to import service:', service.token, error);
+                    }
+
+                    setProgress({ current: i + 1, total: backup.services.length, collection: 'Services' });
+                }
+            }
+
+            // ══════════════════════════════════════
+            // Import Sales (direct PocketBase API)
+            // Schema: customerName, customerId, items(json), subtotal, discount, discountAmount, total,
+            //   profit, modal, paymentMethod, type, cashAccount, ownerId, storeId, createdAt
+            // ══════════════════════════════════════
+            if (backup.sales?.length > 0) {
+                // Fetch existing sales to check duplicates
+                const existingSalesResp = await pb.collection(getTenantCollection('sales', activeOwner.id)).getList(1, 500, {
+                    filter: `ownerId="${activeOwner.id}"`,
+                    fields: 'customerName,total,createdAt'
+                });
+                const existingSalesKeys = new Set(
+                    existingSalesResp.items.map(s => 
+                        `${s.customerName}_${s.total}_${s.createdAt.slice(0, 10)}`
+                    )
+                );
+
+                setProgress({ current: 0, total: backup.sales.length, collection: 'Sales' });
+                for (let i = 0; i < backup.sales.length; i++) {
+                    const sale = backup.sales[i];
+                    
+                    // Check duplicate
+                    const saleDate = convertFirebaseTimestamp(sale.createdAt || sale.date).slice(0, 10);
+                    const dupKey = `${sale.customerName}_${sale.total}_${saleDate}`;
+                    if (existingSalesKeys.has(dupKey)) {
+                        stats.sales.skipped++;
+                        setProgress({ current: i + 1, total: backup.sales.length, collection: 'Sales' });
+                        continue; // Skip duplicate
+                    }
+
+                    try {
+                        const data = {
+                            id: generatePBId(),
+                            customerName: sale.customerName || '',
+                            customerId: sale.customerId || '',
+                            items: jsonField(sale.items, []),
+                            subtotal: Number(sale.subtotal) || 0,
+                            discount: Number(sale.discount) || 0,
+                            discountAmount: Number(sale.discountAmount) || 0,
+                            total: Number(sale.total) || 0,
+                            profit: Number(sale.profit) || 0,
+                            modal: Number(sale.modal) || 0,
+                            paymentMethod: sale.paymentMethod || 'Cash',
+                            type: sale.type || 'sale',
+                            cashAccount: sale.cashAccount || 'Kas Tunai',
+                            ownerId: activeOwner.id,
+                            storeId: activeStore.id,
+                            createdAt: convertFirebaseTimestamp(sale.createdAt || sale.date)
+                        };
+
+                        await pb.collection(getTenantCollection('sales', activeOwner.id)).create(data);
+                        stats.sales.success++;
+                        existingSalesKeys.add(dupKey); // Add to set to prevent re-import in same batch
+                    } catch (error) {
+                        stats.sales.failed++;
+                        errors.push(`Sale "${sale.customerName}": ${error.message}`);
+                        console.error('Failed to import sale:', error);
+                    }
+
+                    setProgress({ current: i + 1, total: backup.sales.length, collection: 'Sales' });
+                }
+            }
+
+            // ══════════════════════════════════════
+            // Import Transactions (direct PocketBase API)
+            // Schema: type, category, description, amount, date, serviceId, originalSaleId, cashAccount,
+            //   items(json), ownerId, storeId, createdAt
+            // ══════════════════════════════════════
+            if (backup.transactions?.length > 0) {
+                setProgress({ current: 0, total: backup.transactions.length, collection: 'Transactions' });
+                for (let i = 0; i < backup.transactions.length; i++) {
+                    const tx = backup.transactions[i];
+
+                    try {
+                        const data = {
+                            id: generatePBId(),
+                            type: tx.type || 'income',
+                            category: tx.category || '',
+                            description: tx.description || '',
+                            amount: Number(tx.amount) || 0,
+                            date: convertFirebaseTimestamp(tx.date),
+                            serviceId: tx.serviceId || '',
+                            originalSaleId: tx.originalSaleId || '',
+                            cashAccount: tx.cashAccount || 'Kas Tunai',
+                            items: jsonField(tx.items, []),
+                            ownerId: activeOwner.id,
+                            storeId: activeStore.id,
+                            createdAt: convertFirebaseTimestamp(tx.createdAt || tx.date)
+                        };
+
+                        await pb.collection(getTenantCollection('transactions', activeOwner.id)).create(data);
+                        stats.transactions.success++;
+                    } catch (error) {
+                        stats.transactions.failed++;
+                        errors.push(`Transaction "${tx.description}": ${error.message}`);
+                        console.error('Failed to import transaction:', tx.description, error);
+                    }
+
+                    if ((i + 1) % 5 === 0 || i === backup.transactions.length - 1) {
+                        setProgress({ current: i + 1, total: backup.transactions.length, collection: 'Transactions' });
+                    }
+                }
+            }
+
+            // ══════════════════════════════════════
+            // Auto-generate Sales from "Penjualan Barang" transactions
+            // (Firebase lama menyimpan penjualan di transactions, bukan di sales terpisah)
+            // ══════════════════════════════════════
+            if (backup.transactions?.length > 0 && (!backup.sales || backup.sales.length === 0)) {
+                const salesFromTx = backup.transactions.filter(tx => tx.category === 'Penjualan Barang' && tx.type === 'income');
+                if (salesFromTx.length > 0) {
+                    stats.sales = stats.sales || { success: 0, failed: 0, skipped: 0 };
+                    setProgress({ current: 0, total: salesFromTx.length, collection: 'Sales (auto)' });
+                    for (let i = 0; i < salesFromTx.length; i++) {
+                        const tx = salesFromTx[i];
+                        try {
+                            // Extract customer name from description "Penjualan X item ke NAMA"
+                            const descMatch = (tx.description || '').match(/ke\s+(.+)$/i);
+                            const customerName = descMatch ? descMatch[1].trim() : '';
+                            const data = {
+                                id: generatePBId(),
+                                customerName: customerName,
+                                customerId: '',
+                                items: jsonField(tx.items, []),
+                                subtotal: Number(tx.amount) || 0,
+                                discount: 0,
+                                discountAmount: 0,
+                                total: Number(tx.amount) || 0,
+                                profit: 0,
+                                modal: 0,
+                                paymentMethod: 'Cash',
+                                type: 'sale',
+                                cashAccount: tx.cashAccount || 'Kas Tunai',
+                                ownerId: activeOwner.id,
+                                storeId: activeStore.id,
+                                createdAt: convertFirebaseTimestamp(tx.date || tx.createdAt)
+                            };
+                            await pb.collection(getTenantCollection('sales', activeOwner.id)).create(data);
+                            stats.sales.success++;
+                        } catch (error) {
+                            stats.sales.failed++;
+                            errors.push(`Sale (auto) "${tx.description}": ${error.message}`);
+                        }
+                        setProgress({ current: i + 1, total: salesFromTx.length, collection: 'Sales (auto)' });
+                    }
+                }
+            }
+
+            // ══════════════════════════════════════
+            // Auto-create missing customers from transactions & services
+            // ══════════════════════════════════════
+            try {
+                // Collect all customer names + phones from services
+                const customerData = new Map(); // name -> {phone, source}
+                
+                if (backup.services) {
+                    backup.services.forEach(s => {
+                        if (s.customerName) {
+                            const name = s.customerName.trim();
+                            const phone = s.phone || s.customerPhone || '';
+                            // Only add if we have phone number or if name not exists yet
+                            if (!customerData.has(name) || phone) {
+                                customerData.set(name, { phone, source: 'service' });
+                            }
+                        }
+                    });
+                }
+                
+                if (backup.transactions) {
+                    backup.transactions.forEach(tx => {
+                        const desc = tx.description || '';
+                        const match = desc.match(/(?:ke|untuk|dari)\s+(.+)$/i);
+                        if (match) {
+                            const name = match[1].trim();
+                            // Skip names that look like sentences
+                            if (name.length < 40 && !name.includes(' - ') && !customerData.has(name)) {
+                                customerData.set(name, { phone: '', source: 'transaction' });
+                            }
+                        }
+                    });
+                }
+
+                // Get existing customer names
+                const existingResp = await pb.collection(getTenantCollection('customers', activeOwner.id)).getList(1, 500, {
+                    filter: `ownerId="${activeOwner.id}"`,
+                    fields: 'name'
+                });
+                const existingNames = new Set(existingResp.items.map(c => c.name.toLowerCase()));
+
+                // Create missing ones
+                const missing = Array.from(customerData.entries())
+                    .filter(([name, _]) => !existingNames.has(name.toLowerCase()));
+                
+                if (missing.length > 0) {
+                    setProgress({ current: 0, total: missing.length, collection: 'Customers (auto)' });
+                    for (let i = 0; i < missing.length; i++) {
+                        const [name, data] = missing[i];
+                        try {
+                            await pb.collection(getTenantCollection('customers', activeOwner.id)).create({
+                                id: generatePBId(),
+                                name: name,
+                                phone: data.phone,
+                                address: '',
+                                customerType: 'regular',
+                                ownerId: activeOwner.id,
+                                storeId: activeStore.id,
+                                createdAt: new Date().toISOString()
+                            });
+                            stats.customers.success++;
+                        } catch (e) {
+                            stats.customers.failed++;
+                        }
+                        setProgress({ current: i + 1, total: missing.length, collection: 'Customers (auto)' });
+                    }
+                }
+            } catch (e) {
+                console.warn('Auto-customer creation error:', e);
+            }
+
+            setResult(stats);
+            setProgress({ current: 0, total: 0, collection: '' });
+            if (errors.length > 0) {
+                console.warn('Restore errors:', errors);
+            }
+            
+        } catch (error) {
+            console.error('Restore error:', error);
+            alert('❌ Gagal restore backup:\n\n' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const totalSuccess = result ? Object.values(result).reduce((sum, stat) => sum + stat.success, 0) : 0;
+    const totalFailed = result ? Object.values(result).reduce((sum, stat) => sum + stat.failed, 0) : 0;
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-slate-800 border border-slate-700 w-full max-w-xl rounded-xl p-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                            <Upload className="w-4 h-4 text-blue-400"/> Restore Backup
+                        </h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            Import data dari backup JSON
+                        </p>
+                    </div>
+                    <button onClick={close} disabled={loading} className="text-slate-400 hover:text-white p-1 disabled:opacity-50">
+                        <X className="w-4 h-4"/>
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {/* File Upload */}
+                    <div>
+                        <label className="text-xs text-slate-400 font-bold uppercase mb-1.5 block">
+                            📁 Pilih File Backup (JSON)
+                        </label>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="application/json,.json"
+                            onChange={handleFileChange}
+                            disabled={loading}
+                            className="hidden"
+                        />
+                        <div
+                            onClick={() => !loading && fileInputRef.current?.click()}
+                            className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all ${
+                                file 
+                                    ? 'border-blue-500 bg-blue-500/10' 
+                                    : 'border-slate-600 bg-slate-900 hover:border-slate-500'
+                            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            {file ? (
+                                <div className="text-blue-300">
+                                    <File className="w-8 h-8 mx-auto mb-2"/>
+                                    <p className="font-bold">{file.name}</p>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        {(file.size / 1024).toFixed(2)} KB
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="text-slate-400">
+                                    <Upload className="w-8 h-8 mx-auto mb-2"/>
+                                    <p className="font-bold">Klik untuk pilih file</p>
+                                    <p className="text-xs mt-1">Format: JSON</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    {loading && progress.total > 0 && (
+                        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-slate-300 font-bold">
+                                    Importing {progress.collection}...
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                    {progress.current} / {progress.total}
+                                </span>
+                            </div>
+                            <div className="w-full bg-slate-700 rounded-full h-2">
+                                <div 
+                                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Result Summary */}
+                    {result && (
+                        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg space-y-2">
+                            <h4 className="text-white font-bold flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-400"/> Hasil Restore
+                            </h4>
+                            <div className="space-y-1 text-xs">
+                                {Object.entries(result).map(([key, stat]) => {
+                                    if (stat.success === 0 && stat.failed === 0) return null;
+                                    return (
+                                        <div key={key} className="flex justify-between items-center">
+                                            <span className="text-slate-300 capitalize">{key}:</span>
+                                            <span className="text-white font-bold">
+                                                <span className="text-green-400">{stat.success} ✓</span>
+                                                {stat.failed > 0 && <span className="text-red-400 ml-2">{stat.failed} ✗</span>}
+                                                {stat.skipped > 0 && <span className="text-yellow-400 ml-2">{stat.skipped} skip</span>}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                                <div className="border-t border-slate-700 pt-2 mt-2">
+                                    <div className="flex justify-between items-center font-bold">
+                                        <span className="text-slate-200">Total Imported:</span>
+                                        <span className="text-green-400">{totalSuccess}</span>
+                                    </div>
+                                    {totalFailed > 0 && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-slate-200">Total Failed:</span>
+                                            <span className="text-red-400">{totalFailed}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Info */}
+                    <div className="bg-blue-900/30 border border-blue-500/30 p-3 rounded-lg">
+                        <h4 className="text-blue-300 font-bold text-xs mb-1.5 flex items-center gap-1.5">
+                            <Info className="w-3.5 h-3.5"/> Informasi Restore
+                        </h4>
+                        <ul className="text-xs text-blue-200 space-y-0.5">
+                            <li>• Support backup format Firebase JSON</li>
+                            <li>• Data akan ditambahkan ke toko aktif</li>
+                            <li>• Data lama tidak akan dihapus</li>
+                            <li>• Record yang sudah ada akan diskip</li>
+                        </ul>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={close} 
+                            disabled={loading}
+                            className="flex-1 py-2 border border-slate-600 rounded-lg font-bold text-sm text-slate-400 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {result ? 'Tutup' : 'Batal'}
+                        </button>
+                        {!result && (
+                            <button 
+                                onClick={handleRestore}
+                                disabled={loading || !file}
+                                className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-blue-700 hover:to-purple-700 flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin"/> Memproses...</>
+                                ) : (
+                                    <><Upload className="w-4 h-4"/> Restore Sekarang</>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // BackupPage - Halaman khusus untuk Backup (untuk Admin & Owner)
 const BackupPage = () => {
     const { user, activeOwner, activeStore, availableStores, checkPermission } = useContext(SessionContext);
@@ -4574,17 +5507,17 @@ const BackupPage = () => {
                     )}
                     
                     <button
-                        className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left opacity-50 cursor-not-allowed"
-                        disabled
+                        onClick={() => setModal('restore')}
+                        className="bg-gradient-to-br from-blue-50 to-green-50 border-2 border-blue-200 p-6 rounded-xl hover:shadow-lg transition-all group text-left"
                     >
                         <div className="flex items-start justify-between mb-3">
-                            <div className="w-12 h-12 bg-slate-400 rounded-xl flex items-center justify-center text-white">
+                            <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white group-hover:scale-110 transition-transform">
                                 <Upload className="w-6 h-6"/>
                             </div>
-                            <span className="text-xs font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-full">COMING SOON</span>
+                            <span className="text-xs font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">NEW</span>
                         </div>
-                        <h4 className="font-bold text-lg mb-2 text-slate-600">Restore Data</h4>
-                        <p className="text-sm text-slate-500">Upload file backup untuk restore data (Coming Soon)</p>
+                        <h4 className="font-bold text-lg mb-2 text-slate-800">Restore Backup</h4>
+                        <p className="text-sm text-slate-600">Upload file backup JSON untuk restore data ke aplikasi</p>
                     </button>
                 </div>
             </div>
@@ -4626,6 +5559,7 @@ const BackupPage = () => {
 
             {/* Modal */}
             {modal === 'backup' && <BackupModal close={() => setModal(null)} />}
+            {modal === 'restore' && <RestoreBackupModal close={() => setModal(null)} />}
         </div>
     );
 };
@@ -4703,10 +5637,11 @@ const DeveloperDashboard = () => {
              
              // Load subscription config from Firestore
              useEffect(() => {
+                 const configRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'subscription_config');
                  const unsub = onSnapshot(
-                     doc(db, APP_COLLECTION_PREFIX, 'public', 'subscription_config', 'settings'),
-                     (snap) => {
-                         if (snap.exists()) setSubConfig(snap.data());
+                     query(configRef, limit(1)),
+                     (snapshot) => {
+                         if (!snapshot.empty) setSubConfig({...snapshot.docs[0].data(), _configId: snapshot.docs[0].id});
                      }
                  );
                  if (window.firestoreListeners) window.firestoreListeners.add(unsub);
@@ -4800,11 +5735,14 @@ const DeveloperDashboard = () => {
                  setLoading(true);
                  try {
                      console.log('💾 Saving subscription config:', newConfig);
-                     await setDoc(
-                         doc(db, APP_COLLECTION_PREFIX, 'public', 'subscription_config', 'settings'),
-                         newConfig,
-                         { merge: true }
-                     );
+                     // Find existing config record, or create new one
+                     const configRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'subscription_config');
+                     const snapshot = await getDocs(query(configRef, limit(1)));
+                     if (!snapshot.empty) {
+                         await updateDoc(snapshot.docs[0].ref, newConfig);
+                     } else {
+                         await addDoc(configRef, newConfig);
+                     }
                      console.log('✅ Subscription config saved successfully');
                      alert('✅ Pengaturan langganan disimpan!');
                      setSubModal(null);
@@ -4880,7 +5818,7 @@ const DeveloperDashboard = () => {
                  let defaultAccessRights;
                  try {
                      const planSnap = await getDoc(
-                         doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', plan)
+                         doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(plan))
                      );
                      if (planSnap.exists()) {
                          defaultAccessRights = planSnap.data();
@@ -4890,7 +5828,7 @@ const DeveloperDashboard = () => {
                          defaultAccessRights = defaultPlans[plan] || defaultPlans.basic;
                          try {
                              await setDoc(
-                                 doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', plan),
+                                 doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(plan)),
                                  { ...defaultAccessRights, plan: plan }
                              );
                              console.log(`✅ Plan "${plan}" auto-created in plan_configs`);
@@ -5034,14 +5972,14 @@ const DeveloperDashboard = () => {
                  let accessRights;
                  try {
                      const planSnap = await getDoc(
-                         doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', plan)
+                         doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(plan))
                      );
                      if (planSnap.exists()) {
                          accessRights = planSnap.data();
                      } else {
                          accessRights = defaultPlans[plan] || defaultPlans.basic;
                          try {
-                             await setDoc(doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', plan), { ...accessRights, plan });
+                             await setDoc(doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId(plan)), { ...accessRights, plan });
                          } catch(e) { console.warn('Auto-create plan_configs failed:', e.message); }
                      }
                  } catch (configErr) {
@@ -5833,6 +6771,7 @@ const DeveloperDashboard = () => {
           const [inventoryAggregation, setInventoryAggregation] = useState({
               totalItems: 0,
               totalStock: 0,
+              totalStockValue: 0,
               loading: true
           });
 
@@ -5859,9 +6798,15 @@ const DeveloperDashboard = () => {
                           totalStock: sum('stock')
                       });
                       
+                      // Also fetch all items to calculate totalStockValue (sellPrice * stock)
+                      const allItemsSnap = await getDocs(q);
+                      const allItems = allItemsSnap.docs.map(d => d.data());
+                      const stockValue = allItems.reduce((s, item) => s + ((item.sellPrice || 0) * (item.stock || 0)), 0);
+                      
                       setInventoryAggregation({
                           totalItems: aggregateSnapshot.data().totalItems,
                           totalStock: aggregateSnapshot.data().totalStock || 0,
+                          totalStockValue: stockValue,
                           loading: false
                       });
                   } catch (error) {
@@ -5870,6 +6815,7 @@ const DeveloperDashboard = () => {
                       setInventoryAggregation({
                           totalItems: inventory.length,
                           totalStock: inventory.reduce((a, b) => a + (b.stock || 0), 0),
+                          totalStockValue: inventory.reduce((s, item) => s + ((item.sellPrice || 0) * (item.stock || 0)), 0),
                           loading: false
                       });
                   }
@@ -6098,7 +7044,7 @@ const DeveloperDashboard = () => {
                 {/* Baris 3: Kompensasi Retur Pembelian + Total Keuntungan */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCard title="Komp. Retur Beli" value={formatCurrency(kompensasi_retur_pembelian)} icon={RotateCw} color="bg-rose-500" sub="Fee ke Supplier" clickable={kompensasi_retur_pembelian > 0} onClick={() => kompensasi_retur_pembelian > 0 && setDetailModal({type:'kompensasi_retur_pembelian', title:'Kompensasi Retur Pembelian'})} />
-                  <StatCard title="Nilai Stok" value={formatCurrency(totalStockValue)} icon={Box} color="bg-indigo-500" sub={inventoryAggregation.loading ? 'Loading...' : `${inventoryAggregation.totalItems} items`} clickable={true} onClick={() => setDetailModal({type:'stock_value', title:'Nilai Total Stok'})} />
+                  <StatCard title="Nilai Stok" value={formatCurrency(inventoryAggregation.totalStockValue || totalStockValue)} icon={Box} color="bg-indigo-500" sub={inventoryAggregation.loading ? 'Loading...' : `${inventoryAggregation.totalItems} items`} clickable={true} onClick={() => setDetailModal({type:'stock_value', title:'Nilai Total Stok'})} />
                   <div className={`col-span-2 p-5 rounded-2xl shadow-sm border relative overflow-hidden transition-all duration-300 text-left ${keuntungan >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
                     <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${keuntungan >= 0 ? 'text-blue-400' : 'text-amber-400'}`}>Total Keuntungan</p>
                     <h3 className={`font-bold text-2xl ${keuntungan >= 0 ? 'text-blue-600' : 'text-amber-600'}`}>{formatCurrency(keuntungan)}</h3>
@@ -6914,6 +7860,7 @@ const DeveloperDashboard = () => {
             const [inventoryAggregation, setInventoryAggregation] = useState({
                 totalItems: 0,
                 totalStock: 0,
+                totalStockValue: 0,
                 loading: true
             });
 
@@ -6940,9 +7887,15 @@ const DeveloperDashboard = () => {
                             totalStock: sum('stock')
                         });
                         
+                        // Also fetch all items to calculate totalStockValue (sellPrice * stock)
+                        const allItemsSnap = await getDocs(q);
+                        const allItems = allItemsSnap.docs.map(d => d.data());
+                        const stockValue = allItems.reduce((s, item) => s + ((item.sellPrice || 0) * (item.stock || 0)), 0);
+                        
                         setInventoryAggregation({
                             totalItems: aggregateSnapshot.data().totalItems,
                             totalStock: aggregateSnapshot.data().totalStock || 0,
+                            totalStockValue: stockValue,
                             loading: false
                         });
                     } catch (error) {
@@ -6951,6 +7904,7 @@ const DeveloperDashboard = () => {
                         setInventoryAggregation({
                             totalItems: inventory.length,
                             totalStock: inventory.reduce((a, b) => a + (b.stock || 0), 0),
+                            totalStockValue: inventory.reduce((s, item) => s + ((item.sellPrice || 0) * (item.stock || 0)), 0),
                             loading: false
                         });
                     }
@@ -10056,7 +11010,18 @@ RINGKASAN KPI:
                 if (newQty <= 0) {
                     removeFromCart(itemId);
                 } else {
+                    const cartItem = cart.find(c => c.id === itemId);
+                    // Manual items don't have stock limits
+                    if (cartItem && cartItem.isManual) {
+                        setCart(cart.map(c => c.id === itemId ? {...c, qty: newQty} : c));
+                        return;
+                    }
                     const item = inventory.find(i => i.id === itemId);
+                    if (!item) {
+                        // Item not found in inventory (e.g. deleted), allow update anyway
+                        setCart(cart.map(c => c.id === itemId ? {...c, qty: newQty} : c));
+                        return;
+                    }
                     if (newQty <= item.stock) {
                         setCart(cart.map(c => c.id === itemId ? {...c, qty: newQty} : c));
                     } else {
@@ -11190,24 +12155,33 @@ RINGKASAN KPI:
                 if (!customer) return;
                 try {
                     if (customer.dbRecord) {
-                        // Customer ada di database → tandai deleted (jangan deleteDoc, karena akan muncul lagi dari transaksi)
-                        await updateDoc(doc(db, APP_COLLECTION_PREFIX, 'public', 'customers', customer.id), {
+                        // Customer ada di database → tandai deleted (jangan delete, karena mungkin ada referensi)
+                        await pb.collection(getTenantCollection('customers', activeOwner.id)).update(customer.id, {
                             deleted: true,
                             deletedAt: new Date().toISOString()
                         });
                     } else {
                         // Customer dari transaksi → buat record baru di DB dengan flag deleted
                         const customerId = customer.id.replace('service_', '').replace('sale_', '');
-                        await setDoc(doc(db, APP_COLLECTION_PREFIX, 'public', 'customers', customerId), {
+                        const generatePBId = () => {
+                            const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                            let result = '';
+                            for (let i = 0; i < 15; i++) {
+                                result += chars.charAt(Math.floor(Math.random() * chars.length));
+                            }
+                            return result;
+                        };
+                        await pb.collection(getTenantCollection('customers', activeOwner.id)).create({
+                            id: generatePBId(),
                             name: customer.name || '',
                             phone: customer.phone || '',
                             address: customer.address || '',
-                            phoneType: customer.phoneType || '',
-                            createdAt: customer.createdAt || new Date().toISOString(),
+                            customerType: customer.phoneType || 'regular',
                             deleted: true,
                             deletedAt: new Date().toISOString(),
                             ownerId: activeOwner?.id || '',
-                            storeId: activeStore?.id || ''
+                            storeId: activeStore?.id || '',
+                            createdAt: customer.createdAt || new Date().toISOString()
                         });
                     }
                     alert('✅ Pelanggan berhasil dihapus!');
@@ -11237,42 +12211,47 @@ RINGKASAN KPI:
                 setDeleteAllModal(false);
                 
                 try {
-                    const batchSize = 500;
                     let totalCount = 0;
+                    const generatePBId = () => {
+                        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+                        let result = '';
+                        for (let i = 0; i < 15; i++) {
+                            result += chars.charAt(Math.floor(Math.random() * chars.length));
+                        }
+                        return result;
+                    };
                     
-                    for (let i = 0; i < allActiveCustomers.length; i += batchSize) {
-                        const batch = writeBatch(db);
-                        const currentBatch = allActiveCustomers.slice(i, i + batchSize);
-                        
-                        currentBatch.forEach(customer => {
+                    for (const customer of allActiveCustomers) {
+                        try {
                             if (customer.dbRecord) {
-                                // Customer ada di database → tandai deleted (bukan deleteDoc)
-                                const docRef = doc(db, APP_COLLECTION_PREFIX, 'public', 'customers', customer.id);
-                                batch.update(docRef, {
+                                // Customer ada di database → tandai deleted (bukan delete fisik)
+                                await pb.collection(getTenantCollection('customers', activeOwner.id)).update(customer.id, {
                                     deleted: true,
                                     deletedAt: new Date().toISOString()
                                 });
                             } else {
-                                // Customer dari transaksi → buat record baru dengan flag deleted + ownerId/storeId
+                                // Customer dari transaksi → buat record baru dengan flag deleted
                                 const customerId = customer.id.replace('service_', '').replace('sale_', '');
-                                const docRef = doc(db, APP_COLLECTION_PREFIX, 'public', 'customers', customerId);
-                                batch.set(docRef, {
+                                await pb.collection(getTenantCollection('customers', activeOwner.id)).create({
+                                    id: generatePBId(),
                                     name: customer.name || '',
                                     phone: customer.phone || '',
                                     address: customer.address || '',
-                                    phoneType: customer.phoneType || '',
-                                    createdAt: customer.createdAt || new Date().toISOString(),
+                                    customerType: customer.phoneType || 'regular',
                                     deleted: true,
                                     deletedAt: new Date().toISOString(),
                                     ownerId: activeOwner?.id || '',
-                                    storeId: activeStore?.id || ''
+                                    storeId: activeStore?.id || '',
+                                    createdAt: customer.createdAt || new Date().toISOString()
                                 });
                             }
                             totalCount++;
-                        });
-                        
-                        await batch.commit();
-                        console.log(`✅ Processed batch: ${i + currentBatch.length}/${allActiveCustomers.length}`);
+                            if (totalCount % 10 === 0) {
+                                console.log(`✅ Processed: ${totalCount}/${allActiveCustomers.length}`);
+                            }
+                        } catch (err) {
+                            console.error(`❌ Failed to delete customer ${customer.name}:`, err);
+                        }
                     }
                     
                     // Clear cache
@@ -11417,7 +12396,8 @@ RINGKASAN KPI:
                     }
                 });
                 
-                return items;
+                // 🔹 Filter: Hanya tampilkan pelanggan yang punya transaksi service
+                return items.filter(c => c.serviceCount > 0);
             }, [serviceCustomers, customers, services]);
 
             const mergedSalesCustomers = useMemo(() => {
@@ -11492,7 +12472,8 @@ RINGKASAN KPI:
                     }
                 });
                 
-                return items;
+                // 🔹 Filter: Hanya tampilkan pelanggan yang punya transaksi penjualan
+                return items.filter(c => c.salesCount > 0);
             }, [salesCustomers, customers, services]);
 
             // Select active customer list based on tab
@@ -14444,7 +15425,7 @@ RINGKASAN KPI:
              // NEW: Reset All Data Function
              const resetAllData = async () => {
                  const confirmText = prompt(
-                     "⚠️ BAHAYA: Ini akan menghapus SEMUA DATA TOKO!\n\nData yang akan dihapus:\n- Semua servis\n- Semua transaksi\n- Semua pelanggan\n- Semua stok barang\n\nKetik 'RESET SEMUA DATA' untuk konfirmasi:"
+                     "⚠️ BAHAYA: Ini akan menghapus SEMUA DATA TOKO!\n\nData yang akan dihapus:\n- Semua servis\n- Semua transaksi\n- Semua pelanggan\n- Semua stok barang\n- Semua riwayat penjualan\n\nKetik 'RESET SEMUA DATA' untuk konfirmasi:"
                  );
                  
                  if (confirmText !== 'RESET SEMUA DATA') {
@@ -14460,7 +15441,7 @@ RINGKASAN KPI:
                      setRestoring(true);
                      console.log('🗑️ Starting complete data reset...');
                      
-                     const collectionsToReset = ['services', 'inventory', 'transactions', 'customers'];
+                     const collectionsToReset = ['services', 'inventory', 'transactions', 'customers', 'sales'];
                      let totalDeleted = 0;
                      
                      // Delete each collection
@@ -21057,7 +22038,7 @@ RINGKASAN KPI:
             // Load plan configs for package modal
             useEffect(() => {
                 const unsubBasic = onSnapshot(
-                    doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', 'basic'),
+                    doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId('basic')),
                     (snap) => {
                         if (snap.exists()) {
                             setPlanConfigs(prev => ({ ...prev, basic: snap.data() }));
@@ -21065,7 +22046,7 @@ RINGKASAN KPI:
                     }
                 );
                 const unsubPro = onSnapshot(
-                    doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', 'pro'),
+                    doc(db, APP_COLLECTION_PREFIX, 'public', 'plan_configs', _planDocId('pro')),
                     (snap) => {
                         if (snap.exists()) {
                             setPlanConfigs(prev => ({ ...prev, pro: snap.data() }));

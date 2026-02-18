@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix All Unverified Users - Auto Verify</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pocketbase/0.21.1/pocketbase.umd.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3); 
+        }
+        h1 { 
+            color: #333; 
+            margin-bottom: 10px; 
+            font-size: 32px;
+        }
+        .subtitle { 
+            color: #666; 
+            margin-bottom: 30px; 
+            font-size: 16px;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 3px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .warning-box h3 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .warning-box p {
+            color: #856404;
+            line-height: 1.6;
+        }
+        .section { 
+            margin-bottom: 25px; 
+            padding: 25px; 
+            background: #f9f9f9; 
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 { 
+            color: #444; 
+            margin-bottom: 15px; 
+            font-size: 20px;
+        }
+        input { 
+            font-size: 16px; 
+            padding: 14px; 
+            border-radius: 8px; 
+            border: 2px solid #ddd; 
+            width: 100%; 
+            margin-bottom: 12px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 16px; 
+            padding: 16px 24px; 
+            border-radius: 10px; 
+            width: 100%;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        button.success { 
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        }
+        button.success:hover {
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
+        }
+        button.danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        }
+        button.danger:hover {
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
+        }
+        .log { 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+            padding: 20px; 
+            border-radius: 10px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 13px; 
+            max-height: 500px; 
+            overflow-y: auto; 
+            margin-top: 20px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .log div { 
+            margin: 5px 0; 
+            white-space: pre-wrap; 
+            line-height: 1.5;
+        }
+        .log .info { color: #4fc3f7; }
+        .log .ok { color: #66bb6a; font-weight: bold; }
+        .log .warn { color: #ffa726; }
+        .log .error { color: #ef5350; font-weight: bold; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Auto Fix: Verify All Users</h1>
+        <p class="subtitle">Tool otomatis untuk verify semua user yang masih unverified</p>
+
+        <div class="warning-box">
+            <h3>⚠️ PERHATIAN</h3>
+            <p><strong>Tool ini akan:</strong></p>
+            <ul style="margin: 10px 0 10px 20px; line-height: 1.8;">
+                <li>Mencari semua user dengan <code>verified=false</code></li>
+                <li>Update status mereka menjadi <code>verified=true</code></li>
+                <li>Pastikan Anda login sebagai <strong>ADMIN</strong> terlebih dahulu</li>
+            </ul>
+            <p style="margin-top: 10px;"><strong>⚡ Proses ini aman dan tidak mengubah password user.</strong></p>
+        </div>
+
+        <div class="section">
+            <h2>Step 1: Admin Authentication</h2>
+            <input type="email" id="adminEmail" placeholder="Email Admin" value="admin@admin.com">
+            <input type="password" id="adminPass" placeholder="Password Admin">
+            <button onclick="authenticate()">🔐 Login sebagai Admin</button>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Scan & Fix</h2>
+            <button onclick="scanUsers()" id="scanBtn" disabled class="success">🔍 Scan Unverified Users</button>
+            <button onclick="fixAllUsers()" id="fixBtn" disabled class="danger">🚀 FIX ALL - Verify Semua User</button>
+        </div>
+
+        <div class="stats-grid" id="stats" style="display: none;">
+            <div class="stat-box">
+                <div class="stat-number" id="totalUsers">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="unverifiedCount">0</div>
+                <div class="stat-label">Unverified</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="fixedCount">0</div>
+                <div class="stat-label">Fixed</div>
+            </div>
+        </div>
+
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const POCKETBASE_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8090' 
+            : 'https://amproject.my.id';
+        const pb = new PocketBase(POCKETBASE_URL);
+        
+        let unverifiedUsers = [];
+
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            const timestamp = new Date().toLocaleTimeString('id-ID');
+            div.textContent = `[${timestamp}] ${msg}`;
+            document.getElementById('log').appendChild(div);
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+            console.log(msg);
+        }
+
+        async function authenticate() {
+            const email = document.getElementById('adminEmail').value;
+            const pass = document.getElementById('adminPass').value;
+            
+            if (!pass) { 
+                alert('❌ Masukkan password admin!'); 
+                return; 
+            }
+
+            try {
+                log('🔐 Authenticating admin...', 'info');
+                await pb.admins.authWithPassword(email, pass);
+                log('✅ Admin login berhasil!', 'ok');
+                log(`   Admin ID: ${pb.authStore.model.id}`, 'info');
+                
+                document.getElementById('scanBtn').disabled = false;
+                document.getElementById('fixBtn').disabled = false;
+                
+            } catch (e) {
+                log(`❌ Admin login gagal: ${e.message}`, 'error');
+                alert('❌ Admin login gagal! Cek email/password.');
+            }
+        }
+
+        async function scanUsers() {
+            try {
+                log('\n========================================', 'info');
+                log('🔍 SCANNING ALL USERS...', 'info');
+                log('========================================\n', 'info');
+
+                // Get all users
+                log('📊 Fetching all users from database...', 'info');
+                const allUsers = await pb.collection('users').getFullList({
+                    sort: '-created',
+                });
+                
+                log(`✅ Found ${allUsers.length} total users`, 'ok');
+
+                // Filter unverified
+                unverifiedUsers = allUsers.filter(u => !u.verified);
+                
+                log(`\n📋 Scan Results:`, 'info');
+                log(`   Total Users: ${allUsers.length}`, 'info');
+                log(`   ✅ Verified: ${allUsers.length - unverifiedUsers.length}`, 'ok');
+                log(`   ❌ Unverified: ${unverifiedUsers.length}`, unverifiedUsers.length > 0 ? 'warn' : 'ok');
+
+                // Update stats
+                document.getElementById('stats').style.display = 'grid';
+                document.getElementById('totalUsers').textContent = allUsers.length;
+                document.getElementById('unverifiedCount').textContent = unverifiedUsers.length;
+                document.getElementById('fixedCount').textContent = '0';
+
+                if (unverifiedUsers.length > 0) {
+                    log('\n📝 Unverified Users:', 'warn');
+                    unverifiedUsers.forEach((u, i) => {
+                        log(`   ${i + 1}. ${u.email} (Role: ${u.role || 'none'}, Owner: ${u.ownerId || 'none'})`, 'warn');
+                    });
+                    log('\n💡 Klik "FIX ALL" untuk verify semua user ini!', 'info');
+                } else {
+                    log('\n🎉 BAGUS! Semua user sudah verified!', 'ok');
+                }
+
+                log('========================================\n', 'info');
+
+            } catch (e) {
+                log(`❌ Error scanning users: ${e.message}`, 'error');
+                console.error(e);
+            }
+        }
+
+        async function fixAllUsers() {
+            if (unverifiedUsers.length === 0) {
+                alert('❌ Tidak ada user yang perlu di-fix. Jalankan Scan dulu!');
+                return;
+            }
+
+            const confirm = window.confirm(
+                `⚠️ Anda akan VERIFY ${unverifiedUsers.length} user.\n\n` +
+                `Ini akan mengubah status mereka dari verified=false ke verified=true.\n\n` +
+                `Password mereka TIDAK BERUBAH.\n\n` +
+                `Lanjutkan?`
+            );
+
+            if (!confirm) return;
+
+            try {
+                log('\n========================================', 'info');
+                log('🚀 FIXING ALL UNVERIFIED USERS...', 'info');
+                log('========================================\n', 'info');
+
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (let i = 0; i < unverifiedUsers.length; i++) {
+                    const user = unverifiedUsers[i];
+                    try {
+                        log(`[${i + 1}/${unverifiedUsers.length}] Verifying: ${user.email}...`, 'info');
+                        
+                        await pb.collection('users').update(user.id, {
+                            verified: true
+                        });
+                        
+                        log(`   ✅ SUCCESS: ${user.email}`, 'ok');
+                        successCount++;
+                        
+                        // Update stats
+                        document.getElementById('fixedCount').textContent = successCount;
+                        
+                    } catch (e) {
+                        log(`   ❌ FAILED: ${user.email} - ${e.message}`, 'error');
+                        errorCount++;
+                    }
+                }
+
+                log('\n========================================', 'info');
+                log('📊 SUMMARY:', 'info');
+                log(`   ✅ Successfully verified: ${successCount}`, 'ok');
+                log(`   ❌ Failed: ${errorCount}`, errorCount > 0 ? 'error' : 'info');
+                log('========================================\n', 'info');
+
+                if (successCount > 0) {
+                    log('🎉 DONE! User-user tadi sekarang bisa login!', 'ok');
+                }
+
+                // Clear unverified list
+                unverifiedUsers = [];
+
+            } catch (e) {
+                log(`❌ Error during fix process: ${e.message}`, 'error');
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>
