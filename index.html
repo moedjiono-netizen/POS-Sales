@@ -7014,22 +7014,9 @@ const DeveloperDashboard = () => {
         const Dashboard = ({setView}) => {
           const { activeOwner, activeStore, checkPermission } = useContext(SessionContext);
           
-          // Permission check
-          if (!checkPermission('menu_dashboard')) {
-              return (
-                  <div className="p-10 text-center">
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-6 inline-block">
-                          <Lock className="w-10 h-10 text-red-600 mx-auto mb-3"/>
-                          <h2 className="text-lg font-bold text-red-600 mb-2">❌ Akses Ditolak</h2>
-                          <p className="text-slate-600">Menu Dashboard telah dikunci oleh Developer/Owner. Hubungi mereka untuk mendapatkan akses.</p>
-                      </div>
-                  </div>
-              );
-          }
-          
           useRealtimePlanSync(activeOwner);
           const { data: services, fromCache: servicesFromCache } = useFirestoreCollection('services', activeOwner?.id, activeStore?.id);
-          const { data: transactions, fromCache: transactionsFromCache } = useFirestoreCollection('transactions', activeOwner?.id, activeStore?.id); // ✅ FIXED: Filter by storeId untuk isolasi data per cabang
+          const { data: transactions, fromCache: transactionsFromCache } = useFirestoreCollection('transactions', activeOwner?.id, activeStore?.id);
           const { data: sales, fromCache: salesFromCache } = useFirestoreCollection('sales', activeOwner?.id, activeStore?.id);
           const { data: users } = useFirestoreCollection('users', activeOwner?.id, activeStore?.id);
           const { data: inventory = [] } = useFirestoreCollection('inventory', activeOwner?.id, activeStore?.id);
@@ -7239,6 +7226,19 @@ const DeveloperDashboard = () => {
             </button> 
           );
           
+          // Permission check (after hooks to comply with React Rules of Hooks)
+          if (!checkPermission('menu_dashboard')) {
+              return (
+                  <div className="p-10 text-center">
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-6 inline-block">
+                          <Lock className="w-10 h-10 text-red-600 mx-auto mb-3"/>
+                          <h2 className="text-lg font-bold text-red-600 mb-2">❌ Akses Ditolak</h2>
+                          <p className="text-slate-600">Menu Dashboard telah dikunci oleh Developer/Owner. Hubungi mereka untuk mendapatkan akses.</p>
+                      </div>
+                  </div>
+              );
+          }
+
           return ( 
             <div className="space-y-6"> 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -8067,23 +8067,10 @@ const DeveloperDashboard = () => {
         const ReportManager = () => {
             const { activeOwner, activeStore, checkPermission } = useContext(SessionContext);
             
-            // Permission check
-            if (!checkPermission('menu_report')) {
-                return (
-                    <div className="p-10 text-center">
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-6 inline-block">
-                            <Lock className="w-10 h-10 text-red-600 mx-auto mb-3"/>
-                            <h2 className="text-lg font-bold text-red-600 mb-2">❌ Akses Ditolak</h2>
-                            <p className="text-slate-600">Menu Laporan telah dikunci oleh Developer/Owner. Hubungi mereka untuk mendapatkan akses.</p>
-                        </div>
-                    </div>
-                );
-            }
-            
             const { data: services } = useFirestoreCollection('services', activeOwner?.id, activeStore?.id);
-            const { data: transactions } = useFirestoreCollection('transactions', activeOwner?.id, activeStore?.id); // ✅ FIXED: Filter by storeId untuk isolasi data per cabang
+            const { data: transactions } = useFirestoreCollection('transactions', activeOwner?.id, activeStore?.id);
             const { data: sales } = useFirestoreCollection('sales', activeOwner?.id, activeStore?.id);
-            const { data: inventory } = useFirestoreCollection('inventory', activeOwner?.id, activeStore?.id);
+            const { data: inventory, loading: inventoryLoading } = useFirestoreCollection('inventory', activeOwner?.id, activeStore?.id);
             const [tab, setTab] = useState('summary');
             const [dateRange, setDateRange] = useState('today');
             const [detailModal, setDetailModal] = useState(null); // { title, data[], type }
@@ -8282,6 +8269,19 @@ RINGKASAN KPI:
             const handleExportExcel = () => {
                 alert('Export Excel akan segera tersedia. Untuk saat ini, gunakan Download PDF dan convert ke Excel.');
             };
+
+            // Permission check (after hooks to comply with React Rules of Hooks)
+            if (!checkPermission('menu_report')) {
+                return (
+                    <div className="p-10 text-center">
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-6 inline-block">
+                            <Lock className="w-10 h-10 text-red-600 mx-auto mb-3"/>
+                            <h2 className="text-lg font-bold text-red-600 mb-2">❌ Akses Ditolak</h2>
+                            <p className="text-slate-600">Menu Laporan telah dikunci oleh Developer/Owner. Hubungi mereka untuk mendapatkan akses.</p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
                 <div className="space-y-6">
@@ -8823,7 +8823,12 @@ RINGKASAN KPI:
                                             {paginatedInventory.length === 0 && (
                                                 <tr>
                                                     <td colSpan="7" className="p-8 text-center text-slate-500">
-                                                        📦 Tidak ada data inventori untuk ditampilkan
+                                                        {inventoryLoading ? (
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                                                <span>Memuat data stok...</span>
+                                                            </div>
+                                                        ) : '📦 Tidak ada data inventori untuk ditampilkan'}
                                                     </td>
                                                 </tr>
                                             )}
