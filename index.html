@@ -344,7 +344,17 @@
     <script>
         // Debug button handler
         document.getElementById('debug-btn').addEventListener('click', function() {
-            window.showError('System Info', 'Tidak ada error.\nIni adalah informasi sistem Anda.', null);
+            // Show system info as informational modal (not an error)
+            const errorDisplay = document.getElementById('error-display');
+            const errorTitle = document.getElementById('error-title');
+            const errorContent = document.getElementById('error-content');
+            const diagInfo = document.getElementById('diagnostic-info');
+            
+            errorTitle.textContent = '🔍 System Info';
+            errorTitle.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+            errorContent.textContent = 'Tidak ada error.\nIni adalah informasi sistem Anda.';
+            diagInfo.textContent = `📍 URL: ${window.location.href}\n🌐 Online: ${navigator.onLine}\n💾 LocalStorage: ${typeof localStorage !== 'undefined' ? 'Available' : 'Unavailable'}\n📱 Platform: ${navigator.platform}\n🖥️ Viewport: ${window.innerWidth}x${window.innerHeight}`;
+            errorDisplay.style.display = 'flex';
         });
         
         document.getElementById('debug-btn').addEventListener('mouseover', function() {
@@ -9427,6 +9437,11 @@ RINGKASAN KPI:
                          return;
                      }
                      
+                     // DISABLED: Auto-recalculate can cause errors on startup
+                     // Only run manually if needed by removing this return
+                     console.log('⚠️ Auto-recalculate disabled to prevent startup errors');
+                     return;
+                     
                      recalculateRef.current = true;
                      console.log('🔍 Recalculating ALL profit transactions with correct service dates...');
                      
@@ -9507,27 +9522,55 @@ RINGKASAN KPI:
              // Fungsi untuk recalculate profit saat service diupdate
              const recalculateServiceProfit = async (serviceId, serviceData, customerName, skipDelete = false) => {
                  try {
+                     // Null check untuk activeOwner dan activeStore
+                     if (!activeOwner?.id || !activeStore?.id) {
+                         console.warn('⚠️ activeOwner or activeStore not available, skipping recalculate');
+                         return;
+                     }
+                     
                      console.log('🔄 Recalculating profit for service:', serviceId);
                      
                      const batch = writeBatch(db);
                      
                      // 1. Delete existing profit/loss transactions for this service (jika bukan batch recalculate)
                      if (!skipDelete) {
-                         const transactionsRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'transactions');
-                         const q = query(
-                             transactionsRef, 
-                             where('serviceId', '==', serviceId),
-                             where('type', 'in', ['profit', 'loss'])
-                         );
-                         const existingSnapshot = await getDocs(q);
-                         
-                         let deletedCount = 0;
-                         existingSnapshot.forEach((doc) => {
-                             batch.delete(doc.ref);
-                             deletedCount++;
-                         });
-                         
-                         console.log(`🗑️ Deleting ${deletedCount} old profit/loss transactions`);
+                         try {
+                             const transactionsRef = collection(db, APP_COLLECTION_PREFIX, 'public', 'transactions');
+                             
+                             // Split query - fetch profit transactions
+                             const qProfit = query(
+                                 transactionsRef, 
+                                 where('serviceId', '==', serviceId),
+                                 where('type', '==', 'profit')
+                             );
+                             
+                             // Split query - fetch loss transactions
+                             const qLoss = query(
+                                 transactionsRef, 
+                                 where('serviceId', '==', serviceId),
+                                 where('type', '==', 'loss')
+                             );
+                             
+                             const [profitSnapshot, lossSnapshot] = await Promise.all([
+                                 getDocs(qProfit),
+                                 getDocs(qLoss)
+                             ]);
+                             
+                             let deletedCount = 0;
+                             profitSnapshot.forEach((doc) => {
+                                 batch.delete(doc.ref);
+                                 deletedCount++;
+                             });
+                             lossSnapshot.forEach((doc) => {
+                                 batch.delete(doc.ref);
+                                 deletedCount++;
+                             });
+                             
+                             console.log(`🗑️ Deleting ${deletedCount} old profit/loss transactions`);
+                         } catch (queryError) {
+                             console.error('⚠️ Error querying old transactions (will continue):', queryError.message);
+                             // Continue anyway - create new transactions
+                         }
                      }
                      
                      // 2. Calculate new profits
@@ -9589,8 +9632,12 @@ RINGKASAN KPI:
                      console.log('✅ Profit recalculation completed successfully');
                      
                  } catch (error) {
-                     console.error('❌ Error recalculating profit:', error);
-                     throw error;
+                     console.error('❌ Error recalculating profit:', {
+                         message: error?.message || 'Unknown error',
+                         serviceId,
+                         error: error
+                     });
+                     // Don't throw - allow service save to continue even if profit calc fails
                  }
              };
              
