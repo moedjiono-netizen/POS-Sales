@@ -8071,7 +8071,8 @@ const DeveloperDashboard = () => {
             const { data: services } = useFirestoreCollection('services', activeOwner?.id, activeStore?.id);
             const { data: transactions } = useFirestoreCollection('transactions', activeOwner?.id, activeStore?.id);
             const { data: sales } = useFirestoreCollection('sales', activeOwner?.id, activeStore?.id);
-            const { data: inventory, loading: inventoryLoading } = useFirestoreCollection('inventory', activeOwner?.id, activeStore?.id);
+            const [inventory, setInventory] = useState([]);
+            const [inventoryLoading, setInventoryLoading] = useState(true);
             const [tab, setTab] = useState('summary');
             const [dateRange, setDateRange] = useState('today');
             const [detailModal, setDetailModal] = useState(null); // { title, data[], type }
@@ -8087,6 +8088,28 @@ const DeveloperDashboard = () => {
             // Pagination states for service tab
             const [serviceCurrentPage, setServiceCurrentPage] = useState(1);
             const [serviceItemsPerPage, setServiceItemsPerPage] = useState(10);
+
+            // Load inventory directly via raw fetch (bypass pb SDK issues)
+            useEffect(() => {
+                if (!activeOwner?.id || !activeStore?.id) return;
+                setInventoryLoading(true);
+                const filter = `ownerId = "${activeOwner.id}" && storeId = "${activeStore.id}"`;
+                fetch(`${POCKETBASE_URL}/api/collections/inventory/records?perPage=2000&sort=-created&filter=${encodeURIComponent(filter)}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.items) {
+                            setInventory(d.items.map(r => ({ id: r.id, ...r })));
+                        } else {
+                            setInventory([]);
+                        }
+                        setInventoryLoading(false);
+                    })
+                    .catch(e => {
+                        console.error('❌ Inventory fetch error:', e);
+                        setInventory([]);
+                        setInventoryLoading(false);
+                    });
+            }, [activeOwner?.id, activeStore?.id]);
 
             // Aggregation data for accurate totals (not affected by limit)
             const [inventoryAggregation, setInventoryAggregation] = useState({
@@ -8778,7 +8801,7 @@ RINGKASAN KPI:
                     )}
 
                     {tab === 'inventory' && (
-                        <div className="space-y-4">
+                        <div className="space-y-4">}
                             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
