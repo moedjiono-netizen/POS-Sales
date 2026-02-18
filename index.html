@@ -9649,7 +9649,27 @@ RINGKASAN KPI:
                 if (paid >= totalBiaya && totalBiaya > 0) paymentStatus = 'Lunas'; 
                 else if (paid > 0) paymentStatus = 'DP'; 
                 
-                const payload = { ...data, costEstimate: totalBiaya, ownerId: activeOwner.id, storeId: activeStore.id, paymentStatus, updatedAt: serverTimestamp(), token: data.token || generateToken() };
+                // Ensure consistent field names in payload
+                const payload = { 
+                    ...data, 
+                    phone: data.phone || '', 
+                    unitType: data.unitType || '',
+                    costEstimate: totalBiaya, 
+                    ownerId: activeOwner.id, 
+                    storeId: activeStore.id, 
+                    paymentStatus, 
+                    updatedAt: serverTimestamp(), 
+                    token: data.token || generateToken() 
+                };
+                
+                console.log('💾 saveService payload:', {
+                    id: modal.id || 'NEW',
+                    customerName: payload.customerName,
+                    phone: payload.phone,
+                    unitType: payload.unitType,
+                    serviceFee: payload.serviceFee
+                });
+                
                  try { 
                      if (modal.id) { 
                          // UPDATE existing service - compare old vs new parts for stock adjustment
@@ -10129,7 +10149,17 @@ RINGKASAN KPI:
                                                     <div className="flex flex-col gap-2">
                                                         {/* Baris 1: Edit, Add Part, Share Progress */}
                                                         <div className="flex justify-center gap-2">
-                                                            <button onClick={() => setModal(s)} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 text-slate-500 transition-all shadow-sm" title="Edit Detail"><Settings className="w-4 h-4"/></button>
+                                                            <button onClick={() => {
+                                                                console.log('🔧 Opening EDIT modal with service:', {
+                                                                    id: s.id,
+                                                                    customerName: s.customerName,
+                                                                    phone: s.phone,
+                                                                    unitType: s.unitType,
+                                                                    serviceFee: s.serviceFee,
+                                                                    allFields: s
+                                                                });
+                                                                setModal(s);
+                                                            }} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-blue-50 hover:text-blue-600 text-slate-500 transition-all shadow-sm" title="Edit Detail"><Settings className="w-4 h-4"/></button>
                                                             <button onClick={() => setAddPartModal(s)} className="p-2 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 text-purple-600 transition-all shadow-sm" title="Tambah Sparepart"><PackagePlus className="w-4 h-4"/></button>
                                                             {canShare ? <button onClick={() => handleShareProgress(s)} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-green-50 text-green-600 shadow-sm" title="Kirim Progress ke WA"><Share2 className="w-4 h-4"/></button> : <button onClick={() => showAccessDenied("Fitur SHARE dikunci")} className="p-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-400 cursor-not-allowed shadow-inner"><Lock className="w-4 h-4"/></button>}
                                                         </div>
@@ -10453,16 +10483,31 @@ RINGKASAN KPI:
             const [form, setForm] = useState(() => {
                 if (initial.id) {
                     // Edit mode - normalize field names for backward compatibility
-                    return {
+                    const normalized = {
                         ...initial,
                         phone: initial.phone || initial.customerPhone || '',
                         unitType: initial.unitType || initial.deviceModel || initial.device || initial.deviceType || ''
                     };
+                    console.log('🔍 ServiceForm EDIT mode - Initial data:', {
+                        id: initial.id,
+                        customerName: initial.customerName,
+                        phone: initial.phone,
+                        customerPhone: initial.customerPhone,
+                        unitType: initial.unitType,
+                        deviceModel: initial.deviceModel,
+                        device: initial.device,
+                        deviceType: initial.deviceType,
+                        normalized_phone: normalized.phone,
+                        normalized_unitType: normalized.unitType
+                    });
+                    return normalized;
                 } else if (initial.customerName) {
                     // New service from customer click - merge with defaults but keep customer data
+                    console.log('🆕 ServiceForm NEW from customer:', initial.customerName);
                     return { ...defaultForm, ...initial };
                 } else {
                     // New service - use defaults but preserve ownerId if provided
+                    console.log('🆕 ServiceForm NEW blank');
                     return { ...defaultForm, ownerId: initial.ownerId };
                 }
             });
