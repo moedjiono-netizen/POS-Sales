@@ -1,0 +1,101 @@
+[
+  {
+    "id": "iC5kYbogOMo3auhlzMo0",
+    "storeId": "F0GvtcixSUC56K4dnF5V",
+    "ownerId": "gorbc9PoVCSyQo8QW5xa",
+    "feature_print": true,
+    "feature_employee_edit": false,
+    "menu_inventory": true,
+    "feature_sales_edit": true,
+    "feature_stock_add": true,
+    "feature_qc_checklist": true,
+    "feature_kelengkapan": true,
+    "inventorySettings": {
+      "preventDuplicateNames": false,
+      "preventDuplicatePrices": false
+    },
+    "customCategories": [
+      "Baterai",
+      "LCD",
+      "Ic",
+      "Tombol luar",
+      "Board bawah",
+      "Flexible tombol onoff volume",
+      "Kartu perdana",
+      "Voucher "
+    ],
+    "menu_service": true,
+    "feature_finance_edit": true,
+    "feature_customer_edit": true,
+    "menu_receivable": true,
+    "menu_return_sales": true,
+    "feature_delete": false,
+    "menu_finance": true,
+    "subCategories": {
+      "VOUCHER TELKOMSEL": [
+        "V-TSEL 10K",
+        "V-TSEL 15K"
+      ],
+      "Aksesori": [
+        "CASE",
+        "HEADSET TYPE C",
+        "HEADSET BIASA",
+        "AD CASAN MOBIL",
+        "CASE HITAM",
+        "HEADSET BLUETOOTH",
+        "BATOK ROBOT BIASA",
+        "BATOK ROBOT BAGUS",
+        "BATOK OLIKE",
+        "K CASAN OLIKE BIASA",
+        "K CASAN OLIKE SEDANG",
+        "K CASAN ROBOT BAGUS"
+      ],
+      "Voucher ": [
+        "V-TELKOMSEL",
+        "V-INDOSAT",
+        "V-AXIS",
+        "V-XL",
+        "V-SMARTFREEN",
+        "V-THREE"
+      ],
+      "Baterai": [
+        "Original",
+        "Biasa"
+      ],
+      "Kartu perdana": [
+        "Telkomsel",
+        "Indosat",
+        "Smartfren",
+        "THREE",
+        "XL-AXIS"
+      ],
+      "LCD": [
+        "OG",
+        "Shinestart",
+        "Sunshine",
+        "Oled",
+        "Tictoc",
+        "Xje",
+        "Meetoo"
+      ]
+    },
+    "feature_share": true,
+    "createdAt": "2026-02-10T05:26:39.000Z",
+    "feature_accounting": true,
+    "menu_cash": true,
+    "menu_report": true,
+    "menu_hr": false,
+    "menu_payable": true,
+    "feature_import_export": false,
+    "menu_purchase": true,
+    "menu_supplier": true,
+    "feature_inventory_edit": true,
+    "menu_sales": true,
+    "menu_return_purchase": true,
+    "menu_customers": true,
+    "feature_service_edit": true,
+    "feature_backup": false,
+    "menu_dashboard": true,
+    "feature_multi_branch": false
+  }
+]

@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restore Store Configs - iFix POS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f9f9f9;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .file-input-label:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .file-name {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .info-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .backup-preview {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+            display: block;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+            display: block;
+        }
+
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #3b82f6;
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .feature-item {
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-enabled {
+            color: #10b981;
+        }
+
+        .feature-disabled {
+            color: #ef4444;
+        }
+
+        .category-list {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .category-item {
+            padding: 8px;
+            background: #f3f4f6;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        .subcategory-list {
+            margin-top: 5px;
+            padding-left: 20px;
+        }
+
+        .subcategory-item {
+            padding: 5px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            margin: 3px 0;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+
+            header h1 {
+                font-size: 1.5em;
+            }
+
+            .feature-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 Restore Store Configs</h1>
+            <p>Restore konfigurasi toko dari file backup</p>
+        </header>
+
+        <div class="content">
+            <!-- Step 1: Upload Backup File -->
+            <div class="section">
+                <h2>📁 Step 1: Upload File Backup</h2>
+                <div class="form-group">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="backupFile" accept=".json" onchange="handleFileSelect(event)">
+                        <label for="backupFile" class="file-input-label">
+                            📤 Pilih File Backup JSON
+                        </label>
+                    </div>
+                    <div id="fileName" class="file-name" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Step 2: Backup Preview -->
+            <div id="backupPreview" class="section" style="display: none;">
+                <h2>📋 Step 2: Preview Backup Data</h2>
+                <div id="backupInfo" class="info-box"></div>
+                <div style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 10px; color: #667eea;">Raw JSON Data:</h3>
+                    <div id="backupPreviewJson" class="backup-preview"></div>
+                </div>
+            </div>
+
+            <!-- Step 3: PocketBase Configuration -->
+            <div id="pbConfigSection" class="section" style="display: none;">
+                <h2>⚙️ Step 3: Konfigurasi PocketBase</h2>
+                <div class="form-group">
+                    <label for="pbUrl">PocketBase URL:</label>
+                    <input type="text" id="pbUrl" placeholder="https://your-domain.com" value="https://ifix.pockethost.io">
+                </div>
+                <div class="form-group">
+                    <label for="adminEmail">Admin Email:</label>
+                    <input type="email" id="adminEmail" placeholder="admin@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="adminPassword">Admin Password:</label>
+                    <input type="password" id="adminPassword" placeholder="Enter admin password">
+                </div>
+                <button class="btn-success" onclick="connectAndLoadStores()">🔌 Connect & Load Stores</button>
+            </div>
+
+            <!-- Step 4: Select Target Store -->
+            <div id="storeSelectSection" class="section" style="display: none;">
+                <h2>🏪 Step 4: Pilih Target Store</h2>
+                <div class="form-group">
+                    <label for="targetStore">Target Store:</label>
+                    <select id="targetStore">
+                        <option value="">-- Pilih Store --</option>
+                    </select>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn-primary" onclick="startRestore()">🚀 Mulai Restore</button>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px; color: #667eea; font-weight: 600;">Processing...</p>
+            </div>
+
+            <!-- Status Messages -->
+            <div id="statusMessage" class="status"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pocketbase@0.21.5/dist/pocketbase.umd.js"></script>
+    <script>
+        let pb;
+        let backupData = null;
+        let stores = [];
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').textContent = `📄 ${file.name}`;
+            document.getElementById('fileName').style.display = 'block';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    backupData = JSON.parse(e.target.result);
+                    displayBackupPreview(backupData);
+                    document.getElementById('backupPreview').style.display = 'block';
+                    document.getElementById('pbConfigSection').style.display = 'block';
+                    showStatus('success', `✅ File backup berhasil dimuat! Total ${backupData.length} store config ditemukan.`);
+                } catch (error) {
+                    showStatus('error', '❌ Error parsing JSON: ' + error.message);
+                    backupData = null;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayBackupPreview(data) {
+            const config = data[0]; // Assuming single store config
+            
+            let infoHTML = '<div class="info-row"><div class="info-label">Total Configs:</div><div class="info-value">' + data.length + '</div></div>';
+            
+            if (config) {
+                infoHTML += '<div class="info-row"><div class="info-label">Store ID:</div><div class="info-value">' + (config.storeId || 'N/A') + '</div></div>';
+                infoHTML += '<div class="info-row"><div class="info-label">Owner ID:</div><div class="info-value">' + (config.ownerId || 'N/A') + '</div></div>';
+                infoHTML += '<div class="info-row"><div class="info-label">Created At:</div><div class="info-value">' + (config.createdAt || 'N/A') + '</div></div>';
+                
+                // Display features
+                if (config) {
+                    infoHTML += '<div style="margin-top: 20px;"><h3 style="color: #667eea; margin-bottom: 10px;">Features & Menus:</h3><div class="feature-list">';
+                    
+                    for (const [key, value] of Object.entries(config)) {
+                        if (key.startsWith('feature_') || key.startsWith('menu_')) {
+                            const label = key.replace('feature_', '').replace('menu_', '').replace(/_/g, ' ');
+                            const icon = value ? '✅' : '❌';
+                            const className = value ? 'feature-enabled' : 'feature-disabled';
+                            infoHTML += `<div class="feature-item ${className}">${icon} ${label}</div>`;
+                        }
+                    }
+                    infoHTML += '</div></div>';
+                }
+                
+                // Display custom categories
+                if (config.customCategories && config.customCategories.length > 0) {
+                    infoHTML += '<div style="margin-top: 20px;"><h3 style="color: #667eea; margin-bottom: 10px;">Custom Categories:</h3><div class="category-list">';
+                    config.customCategories.forEach(cat => {
+                        infoHTML += `<div class="category-item">📦 ${cat}</div>`;
+                    });
+                    infoHTML += '</div></div>';
+                }
+                
+                // Display subcategories
+                if (config.subCategories) {
+                    infoHTML += '<div style="margin-top: 20px;"><h3 style="color: #667eea; margin-bottom: 10px;">Subcategories:</h3><div class="category-list">';
+                    for (const [category, items] of Object.entries(config.subCategories)) {
+                        infoHTML += `<div class="category-item">📁 ${category}<div class="subcategory-list">`;
+                        items.forEach(item => {
+                            infoHTML += `<div class="subcategory-item">└─ ${item}</div>`;
+                        });
+                        infoHTML += '</div></div>';
+                    }
+                    infoHTML += '</div></div>';
+                }
+            }
+            
+            document.getElementById('backupInfo').innerHTML = infoHTML;
+            document.getElementById('backupPreviewJson').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function connectAndLoadStores() {
+            const pbUrl = document.getElementById('pbUrl').value.trim();
+            const email = document.getElementById('adminEmail').value.trim();
+            const password = document.getElementById('adminPassword').value.trim();
+
+            if (!pbUrl || !email || !password) {
+                showStatus('error', '❌ Mohon lengkapi semua field PocketBase!');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                pb = new PocketBase(pbUrl);
+                
+                // Authenticate as admin
+                await pb.admins.authWithPassword(email, password);
+                showStatus('success', '✅ Berhasil terhubung ke PocketBase sebagai admin!');
+                
+                // Load stores
+                stores = await pb.collection('stores').getFullList({
+                    sort: 'name'
+                });
+                
+                const storeSelect = document.getElementById('targetStore');
+                storeSelect.innerHTML = '<option value="">-- Pilih Store --</option>';
+                
+                stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store.id;
+                    option.textContent = `${store.name} (${store.id})`;
+                    storeSelect.appendChild(option);
+                });
+                
+                document.getElementById('storeSelectSection').style.display = 'block';
+                showStatus('success', `✅ Berhasil memuat ${stores.length} stores!`);
+                
+            } catch (error) {
+                showStatus('error', '❌ Error connecting to PocketBase: ' + error.message);
+                console.error(error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function startRestore() {
+            const targetStoreId = document.getElementById('targetStore').value;
+            
+            if (!targetStoreId) {
+                showStatus('error', '❌ Mohon pilih target store!');
+                return;
+            }
+            
+            if (!backupData || backupData.length === 0) {
+                showStatus('error', '❌ Tidak ada data backup!');
+                return;
+            }
+            
+            if (!confirm('⚠️ Apakah Anda yakin ingin restore konfigurasi ini? Data konfigurasi lama akan ditimpa!')) {
+                return;
+            }
+            
+            showLoading(true);
+            
+            try {
+                const config = backupData[0];
+                const targetStore = stores.find(s => s.id === targetStoreId);
+                
+                // Prepare data for restore
+                const restoreData = {
+                    storeId: targetStoreId,
+                    ownerId: targetStore.ownerId,
+                    feature_print: config.feature_print || false,
+                    feature_employee_edit: config.feature_employee_edit || false,
+                    menu_inventory: config.menu_inventory || true,
+                    feature_sales_edit: config.feature_sales_edit || true,
+                    feature_stock_add: config.feature_stock_add || true,
+                    feature_qc_checklist: config.feature_qc_checklist || false,
+                    feature_kelengkapan: config.feature_kelengkapan || false,
+                    inventorySettings: config.inventorySettings || {},
+                    customCategories: config.customCategories || [],
+                    menu_service: config.menu_service || false,
+                    feature_finance_edit: config.feature_finance_edit || false,
+                    feature_customer_edit: config.feature_customer_edit || false,
+                    menu_receivable: config.menu_receivable || false,
+                    menu_return_sales: config.menu_return_sales || false,
+                    feature_delete: config.feature_delete || false,
+                    menu_finance: config.menu_finance || false,
+                    subCategories: config.subCategories || {},
+                    feature_share: config.feature_share || false,
+                    feature_accounting: config.feature_accounting || false,
+                    menu_cash: config.menu_cash || false,
+                    menu_report: config.menu_report || false,
+                    menu_hr: config.menu_hr || false,
+                    menu_payable: config.menu_payable || false,
+                    feature_import_export: config.feature_import_export || false,
+                    menu_purchase: config.menu_purchase || false,
+                    menu_supplier: config.menu_supplier || false,
+                    feature_inventory_edit: config.feature_inventory_edit || false,
+                    menu_sales: config.menu_sales || true,
+                    menu_return_purchase: config.menu_return_purchase || false,
+                    menu_customers: config.menu_customers || false,
+                    feature_service_edit: config.feature_service_edit || false,
+                    feature_backup: config.feature_backup || false,
+                    menu_dashboard: config.menu_dashboard || true,
+                    feature_multi_branch: config.feature_multi_branch || false
+                };
+                
+                // Check if store_configs already exists for this store
+                let existingConfigs = await pb.collection('store_configs').getFullList({
+                    filter: `storeId = "${targetStoreId}"`
+                });
+                
+                let result;
+                if (existingConfigs.length > 0) {
+                    // Update existing config
+                    result = await pb.collection('store_configs').update(existingConfigs[0].id, restoreData);
+                    showStatus('success', `✅ Konfigurasi berhasil diupdate untuk store: ${targetStore.name}`);
+                } else {
+                    // Create new config
+                    result = await pb.collection('store_configs').create(restoreData);
+                    showStatus('success', `✅ Konfigurasi berhasil dibuat untuk store: ${targetStore.name}`);
+                }
+                
+                console.log('Restore result:', result);
+                
+            } catch (error) {
+                showStatus('error', '❌ Error during restore: ' + error.message);
+                console.error(error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').className = show ? 'loading active' : 'loading';
+        }
+
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = 'status ' + type;
+            statusDiv.innerHTML = '<strong>' + message + '</strong>';
+            
+            // Auto hide after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>

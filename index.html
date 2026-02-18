@@ -4741,11 +4741,13 @@ const BackupModal = ({ close }) => {
 
 // RestoreBackupModal - Modal untuk restore backup JSON (untuk Owner & Admin)
 const RestoreBackupModal = ({ close }) => {
-    const { activeOwner, activeStore } = useContext(SessionContext);
+    const { activeOwner, activeStore, availableStores } = useContext(SessionContext);
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0, collection: '' });
     const [result, setResult] = useState(null);
+    const [restoreType, setRestoreType] = useState('data'); // 'data' or 'config'
+    const [selectedStore, setSelectedStore] = useState('');
     const fileInputRef = useRef(null);
 
     // Convert Firebase timestamp to ISO string
@@ -4776,6 +4778,136 @@ const RestoreBackupModal = ({ close }) => {
             setResult(null);
         } else {
             alert('❌ Pilih file JSON yang valid!');
+        }
+    };
+
+    // Handle Restore Store Configs
+    const handleRestoreConfig = async () => {
+        if (!file) {
+            alert('❌ Pilih file backup store config terlebih dahulu!');
+            return;
+        }
+
+        if (!activeOwner?.id) {
+            alert('❌ Data owner tidak ditemukan!');
+            return;
+        }
+
+        const targetStoreId = selectedStore || activeStore?.id;
+        if (!targetStoreId) {
+            alert('❌ Pilih target store untuk restore!');
+            return;
+        }
+
+        const targetStore = availableStores.find(s => s.id === targetStoreId);
+        if (!targetStore) {
+            alert('❌ Target store tidak ditemukan!');
+            return;
+        }
+
+        const confirmRestore = confirm(
+            `⚠️ KONFIRMASI RESTORE STORE CONFIG\n\n` +
+            `File: ${file.name}\n` +
+            `Target Store: ${targetStore.name}\n` +
+            `Owner: ${activeOwner.name}\n\n` +
+            `Konfigurasi store akan ditimpa dengan data dari backup.\n\n` +
+            `Lanjutkan restore?`
+        );
+
+        if (!confirmRestore) return;
+
+        setLoading(true);
+        setResult(null);
+
+        try {
+            // Read file
+            const text = await file.text();
+            let backup = JSON.parse(text);
+
+            // Validate format - harus array dengan store config
+            if (!Array.isArray(backup) || backup.length === 0) {
+                alert('❌ Format backup store config tidak valid! File harus berisi array of config objects.');
+                setLoading(false);
+                return;
+            }
+
+            const config = backup[0]; // Ambil config pertama
+
+            // Validate required fields
+            if (!config.customCategories && !config.subCategories && config.menu_inventory === undefined) {
+                alert('❌ File bukan backup store config yang valid!');
+                setLoading(false);
+                return;
+            }
+
+            // Prepare data for restore
+            const restoreData = {
+                storeId: targetStoreId,
+                ownerId: activeOwner.id,
+                feature_print: config.feature_print || false,
+                feature_employee_edit: config.feature_employee_edit || false,
+                menu_inventory: config.menu_inventory !== undefined ? config.menu_inventory : true,
+                feature_sales_edit: config.feature_sales_edit !== undefined ? config.feature_sales_edit : true,
+                feature_stock_add: config.feature_stock_add || false,
+                feature_qc_checklist: config.feature_qc_checklist || false,
+                feature_kelengkapan: config.feature_kelengkapan || false,
+                inventorySettings: config.inventorySettings ? JSON.stringify(config.inventorySettings) : JSON.stringify({}),
+                customCategories: config.customCategories ? JSON.stringify(config.customCategories) : JSON.stringify([]),
+                menu_service: config.menu_service || false,
+                feature_finance_edit: config.feature_finance_edit || false,
+                feature_customer_edit: config.feature_customer_edit || false,
+                menu_receivable: config.menu_receivable || false,
+                menu_return_sales: config.menu_return_sales || false,
+                feature_delete: config.feature_delete || false,
+                menu_finance: config.menu_finance || false,
+                subCategories: config.subCategories ? JSON.stringify(config.subCategories) : JSON.stringify({}),
+                feature_share: config.feature_share || false,
+                feature_accounting: config.feature_accounting || false,
+                menu_cash: config.menu_cash || false,
+                menu_report: config.menu_report || false,
+                menu_hr: config.menu_hr || false,
+                menu_payable: config.menu_payable || false,
+                feature_import_export: config.feature_import_export || false,
+                menu_purchase: config.menu_purchase || false,
+                menu_supplier: config.menu_supplier || false,
+                feature_inventory_edit: config.feature_inventory_edit || false,
+                menu_sales: config.menu_sales !== undefined ? config.menu_sales : true,
+                menu_return_purchase: config.menu_return_purchase || false,
+                menu_customers: config.menu_customers || false,
+                feature_service_edit: config.feature_service_edit || false,
+                feature_backup: config.feature_backup || false,
+                menu_dashboard: config.menu_dashboard !== undefined ? config.menu_dashboard : true,
+                feature_multi_branch: config.feature_multi_branch || false
+            };
+
+            // Check if store_configs already exists for this store
+            let existingConfigs = await pb.collection(getTenantCollection('store_configs', activeOwner.id)).getFullList({
+                filter: `storeId = "${targetStoreId}"`
+            });
+
+            let resultMessage;
+            if (existingConfigs.length > 0) {
+                // Update existing config
+                await pb.collection(getTenantCollection('store_configs', activeOwner.id)).update(existingConfigs[0].id, restoreData);
+                resultMessage = `✅ Konfigurasi berhasil diupdate untuk store: ${targetStore.name}`;
+            } else {
+                // Create new config
+                await pb.collection(getTenantCollection('store_configs', activeOwner.id)).create(restoreData);
+                resultMessage = `✅ Konfigurasi berhasil dibuat untuk store: ${targetStore.name}`;
+            }
+
+            setResult({
+                store_configs: { success: 1, failed: 0, skipped: 0, message: resultMessage }
+            });
+
+        } catch (error) {
+            console.error('Restore config error:', error);
+            alert('❌ Gagal restore store config:\n\n' + error.message);
+            setResult({
+                store_configs: { success: 0, failed: 1, skipped: 0, message: error.message }
+            });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -5289,7 +5421,55 @@ const RestoreBackupModal = ({ close }) => {
                     </button>
                 </div>
 
+                {/* Tab Selector */}
+                <div className="flex gap-2 mb-4">
+                    <button
+                        onClick={() => { setRestoreType('data'); setFile(null); setResult(null); }}
+                        disabled={loading}
+                        className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
+                            restoreType === 'data'
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        } disabled:opacity-50`}
+                    >
+                        📦 Data Backup
+                    </button>
+                    <button
+                        onClick={() => { setRestoreType('config'); setFile(null); setResult(null); }}
+                        disabled={loading}
+                        className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${
+                            restoreType === 'config'
+                                ? 'bg-purple-600 text-white shadow-lg'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        } disabled:opacity-50`}
+                    >
+                        ⚙️ Store Configs
+                    </button>
+                </div>
+
                 <div className="space-y-4">
+                    {/* Store Selector - hanya untuk config restore */}
+                    {restoreType === 'config' && (
+                        <div>
+                            <label className="text-xs text-slate-400 font-bold uppercase mb-1.5 block">
+                                🏪 Pilih Target Store
+                            </label>
+                            <select
+                                value={selectedStore}
+                                onChange={(e) => setSelectedStore(e.target.value)}
+                                disabled={loading}
+                                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                            >
+                                <option value="">-- Pilih Store --</option>
+                                {availableStores?.map(store => (
+                                    <option key={store.id} value={store.id}>
+                                        {store.name} {store.id === activeStore?.id ? '(Aktif)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {/* File Upload */}
                     <div>
                         <label className="text-xs text-slate-400 font-bold uppercase mb-1.5 block">
@@ -5359,43 +5539,67 @@ const RestoreBackupModal = ({ close }) => {
                                 {Object.entries(result).map(([key, stat]) => {
                                     if (stat.success === 0 && stat.failed === 0) return null;
                                     return (
-                                        <div key={key} className="flex justify-between items-center">
-                                            <span className="text-slate-300 capitalize">{key}:</span>
-                                            <span className="text-white font-bold">
-                                                <span className="text-green-400">{stat.success} ✓</span>
-                                                {stat.failed > 0 && <span className="text-red-400 ml-2">{stat.failed} ✗</span>}
-                                                {stat.skipped > 0 && <span className="text-yellow-400 ml-2">{stat.skipped} skip</span>}
-                                            </span>
+                                        <div key={key} className="flex flex-col gap-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-slate-300 capitalize">{key.replace('_', ' ')}:</span>
+                                                <span className="text-white font-bold">
+                                                    <span className="text-green-400">{stat.success} ✓</span>
+                                                    {stat.failed > 0 && <span className="text-red-400 ml-2">{stat.failed} ✗</span>}
+                                                    {stat.skipped > 0 && <span className="text-yellow-400 ml-2">{stat.skipped} skip</span>}
+                                                </span>
+                                            </div>
+                                            {stat.message && (
+                                                <div className="text-blue-300 text-xs pl-2 border-l-2 border-blue-500">
+                                                    {stat.message}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
-                                <div className="border-t border-slate-700 pt-2 mt-2">
-                                    <div className="flex justify-between items-center font-bold">
-                                        <span className="text-slate-200">Total Imported:</span>
-                                        <span className="text-green-400">{totalSuccess}</span>
-                                    </div>
-                                    {totalFailed > 0 && (
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-slate-200">Total Failed:</span>
-                                            <span className="text-red-400">{totalFailed}</span>
+                                {restoreType === 'data' && (
+                                    <div className="border-t border-slate-700 pt-2 mt-2">
+                                        <div className="flex justify-between items-center font-bold">
+                                            <span className="text-slate-200">Total Imported:</span>
+                                            <span className="text-green-400">{totalSuccess}</span>
                                         </div>
-                                    )}
-                                </div>
+                                        {totalFailed > 0 && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-slate-200">Total Failed:</span>
+                                                <span className="text-red-400">{totalFailed}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* Info */}
-                    <div className="bg-blue-900/30 border border-blue-500/30 p-3 rounded-lg">
-                        <h4 className="text-blue-300 font-bold text-xs mb-1.5 flex items-center gap-1.5">
+                    <div className={`p-3 rounded-lg ${
+                        restoreType === 'config' 
+                            ? 'bg-purple-900/30 border border-purple-500/30' 
+                            : 'bg-blue-900/30 border border-blue-500/30'
+                    }`}>
+                        <h4 className={`font-bold text-xs mb-1.5 flex items-center gap-1.5 ${
+                            restoreType === 'config' ? 'text-purple-300' : 'text-blue-300'
+                        }`}>
                             <Info className="w-3.5 h-3.5"/> Informasi Restore
                         </h4>
-                        <ul className="text-xs text-blue-200 space-y-0.5">
-                            <li>• Support backup format Firebase JSON</li>
-                            <li>• Data akan ditambahkan ke toko aktif</li>
-                            <li>• Data lama tidak akan dihapus</li>
-                            <li>• Record yang sudah ada akan diskip</li>
-                        </ul>
+                        {restoreType === 'data' ? (
+                            <ul className="text-xs text-blue-200 space-y-0.5">
+                                <li>• Support backup format Firebase JSON</li>
+                                <li>• Data akan ditambahkan ke toko aktif</li>
+                                <li>• Data lama tidak akan dihapus</li>
+                                <li>• Record yang sudah ada akan diskip</li>
+                            </ul>
+                        ) : (
+                            <ul className="text-xs text-purple-200 space-y-0.5">
+                                <li>• File backup store configs dari backup collection</li>
+                                <li>• Pilih target store yang akan di-restore</li>
+                                <li>• Konfigurasi lama akan ditimpa (update)</li>
+                                <li>• Termasuk: features, menus, categories, subcategories</li>
+                            </ul>
+                        )}
                     </div>
 
                     {/* Action Buttons */}
@@ -5409,14 +5613,18 @@ const RestoreBackupModal = ({ close }) => {
                         </button>
                         {!result && (
                             <button 
-                                onClick={handleRestore}
-                                disabled={loading || !file}
-                                className="flex-1 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-bold text-sm hover:from-blue-700 hover:to-purple-700 flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={restoreType === 'config' ? handleRestoreConfig : handleRestore}
+                                disabled={loading || !file || (restoreType === 'config' && !selectedStore)}
+                                className={`flex-1 py-2 bg-gradient-to-r text-white rounded-lg font-bold text-sm hover:shadow-xl flex items-center justify-center gap-1.5 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                                    restoreType === 'config'
+                                        ? 'from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+                                        : 'from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
+                                }`}
                             >
                                 {loading ? (
                                     <><Loader2 className="w-4 h-4 animate-spin"/> Memproses...</>
                                 ) : (
-                                    <><Upload className="w-4 h-4"/> Restore Sekarang</>
+                                    <><Upload className="w-4 h-4"/> {restoreType === 'config' ? 'Restore Config' : 'Restore Data'}</>
                                 )}
                             </button>
                         )}
