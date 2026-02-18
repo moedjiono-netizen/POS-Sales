@@ -10405,8 +10405,12 @@ RINGKASAN KPI:
             // If initial has customerName, use it (from customer click). Otherwise check for id (edit mode)
             const [form, setForm] = useState(() => {
                 if (initial.id) {
-                    // Edit mode - use full initial data
-                    return initial;
+                    // Edit mode - normalize field names for backward compatibility
+                    return {
+                        ...initial,
+                        phone: initial.phone || initial.customerPhone || '',
+                        unitType: initial.unitType || initial.deviceModel || initial.device || initial.deviceType || ''
+                    };
                 } else if (initial.customerName) {
                     // New service from customer click - merge with defaults but keep customer data
                     return { ...defaultForm, ...initial };
